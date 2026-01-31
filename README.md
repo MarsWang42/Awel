@@ -1,5 +1,7 @@
 # Awel
 
+English | [中文](./README.zh-CN.md)
+
 AI-powered development overlay for Next.js. Awel runs a proxy in front of your dev server, injects a floating chat button into your app, and lets you talk to an AI agent that can read, write, and edit files in your project — all from an embedded dashboard.
 
 ![Awel dashboard overlay](docs/screenshot.png)
