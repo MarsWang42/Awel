@@ -71,6 +71,13 @@ The AI agent has access to:
 ## Features
 
 - **Element inspector** — click the crosshair icon to select an element in your app and attach it as context to your prompt
+
+  ![Element inspector](docs/Screenshot-Inspector.png)
+
+- **Screenshot annotator** — annotate screenshots with shapes, arrows, and text before sending to the agent
+
+  ![Screenshot annotator](docs/Screenshot-annotator.png)
+
 - **Image attachments** — attach screenshots or reference images
 - **Plan approval** — the agent can propose plans for you to review before making changes
 - **Undo** — roll back all file changes from an agent session in one click

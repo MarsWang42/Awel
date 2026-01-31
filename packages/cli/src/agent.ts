@@ -188,6 +188,13 @@ export function createAgentRoute(projectCwd: string, targetPort: number) {
                         appendResponseMessages(responseMessages);
                     }
                 })
+                .catch((err) => {
+                    // Swallow provider-level rejections (e.g. API 400 from tool-use
+                    // concurrency in Claude Code). The error has already been surfaced
+                    // as an SSE error event inside streamResponse.
+                    const msg = err instanceof Error ? err.message : String(err);
+                    console.error(`[awel] streamResponse rejected: ${msg}`);
+                })
                 .finally(() => {
                     if (!signal.aborted) {
                         streamBus.emit('end');

@@ -461,9 +461,20 @@ export function createVercelProvider(modelId: string, providerType: VercelProvid
                         }
                     }
                 } catch (err) {
-                    // Ignore abort errors from user-input pauses or external cancellation
+                    // Ignore abort errors from user-input pauses or external cancellation.
+                    // For other errors (e.g. transient API 400s from tool-use concurrency),
+                    // log and surface them as SSE error events instead of killing the stream.
                     const externallyAborted = config.signal?.aborted;
-                    if (!waitingForUserInput && !externallyAborted) throw err;
+                    if (!waitingForUserInput && !externallyAborted) {
+                        const errorMsg = err instanceof Error ? err.message : String(err);
+                        logEvent('error', `stream error (non-fatal): ${errorMsg}`);
+                        const errorData = JSON.stringify({
+                            type: 'error',
+                            message: errorMsg
+                        });
+                        addToHistory('error', errorData);
+                        await stream.writeSSE({ event: 'error', data: errorData });
+                    }
                 }
 
                 // Capture response messages for multi-turn accumulation.
