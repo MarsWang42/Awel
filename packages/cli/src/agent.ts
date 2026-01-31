@@ -306,5 +306,11 @@ export function createAgentRoute(projectCwd: string, targetPort: number) {
         return c.json(getDevServerStatus());
     });
 
+    // ─── Project Info ───────────────────────────────────────
+
+    agent.get('/api/project-info', (c) => {
+        return c.json({ projectCwd });
+    });
+
     return agent;
 }

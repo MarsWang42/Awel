@@ -171,6 +171,13 @@ export function useConsole(selectedModel: string, onReviewDiffs?: (diffs: import
                             } as ParsedMessage)
                         }
                     }
+                    // Mark question messages as answered if they're not the last message
+                    for (let j = 0; j < parsedMessages.length - 1; j++) {
+                        if (parsedMessages[j].type === 'question') {
+                            parsedMessages[j].answered = true
+                        }
+                    }
+
                     setMessages(parsedMessages)
                 }
             } catch {
@@ -518,6 +525,13 @@ export function useConsole(selectedModel: string, onReviewDiffs?: (diffs: import
     // ─── Question Handler ────────────────────────────────────
 
     const handleQuestionAnswer = useCallback((_questionId: string, answers: Record<string, string[]>) => {
+        // Mark the question message as answered
+        setMessages(prev => prev.map(m =>
+            m.type === 'question' && m.questionId === _questionId
+                ? { ...m, answered: true }
+                : m
+        ))
+
         // Build a readable summary of the user's selections
         const lines = Object.entries(answers).map(([header, selected]) =>
             `**${header}**: ${selected.join(', ')}`
@@ -636,6 +650,7 @@ export function useConsole(selectedModel: string, onReviewDiffs?: (diffs: import
                         questions: msg.questions,
                         onAnswer: handleQuestionAnswer,
                         disabled: aborted,
+                        answered: msg.answered,
                     }) : null
                     break
                 case 'result':

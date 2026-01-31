@@ -32,6 +32,8 @@ export function useTheme() {
         } else {
             root.classList.remove('dark')
         }
+        // Broadcast to host so it can theme the comment popup, trigger button, etc.
+        window.parent.postMessage({ type: 'AWEL_THEME', theme: resolvedTheme }, '*')
     }, [resolvedTheme])
 
     useEffect(() => {

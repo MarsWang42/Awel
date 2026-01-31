@@ -4,6 +4,7 @@
  */
 
 import { execa, type ResultPromise } from 'execa';
+import { watch, type FSWatcher } from 'node:fs';
 import { awel, pipeChildOutput } from './logger.js';
 
 export type DevServerStatus = 'stopped' | 'starting' | 'running' | 'restarting' | 'crashed';
@@ -29,6 +30,56 @@ const state: DevServerState = {
 };
 
 let autoRestartEnabled = true;
+let crashWatcher: FSWatcher | null = null;
+let crashDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+const SOURCE_EXT_RE = /\.(ts|tsx|js|jsx|json|css|scss|html|mdx?)$/;
+const IGNORE_RE = /(?:^|[/\\])(?:node_modules|\.next|\.git|dist|build)[/\\]/;
+
+/**
+ * Start watching the project directory for file changes while the server is
+ * crashed.  When a source file is modified (e.g. the agent fixed the bug),
+ * restart immediately instead of waiting for the next backoff tick.
+ */
+function startCrashWatcher() {
+    if (crashWatcher) return;
+
+    crashWatcher = watch(state.cwd, { recursive: true }, (_event, filename) => {
+        if (!filename) return;
+        if (IGNORE_RE.test(filename)) return;
+        if (!SOURCE_EXT_RE.test(filename)) return;
+        if (state.status !== 'crashed') return;
+
+        // Debounce — agents often write multiple files in quick succession
+        if (crashDebounceTimer) clearTimeout(crashDebounceTimer);
+        crashDebounceTimer = setTimeout(async () => {
+            if (state.status !== 'crashed') return;
+            awel.log(`File changed (${filename}), restarting dev server...`);
+            stopCrashWatcher();
+            try {
+                state.restartCount = 0;
+                await doSpawn();
+                awel.log('Dev server restarted after file change.');
+            } catch (err) {
+                const msg = err instanceof Error ? err.message : String(err);
+                awel.error(`Restart after file change failed: ${msg}`);
+                // Re-enable watcher for the next change
+                startCrashWatcher();
+            }
+        }, 500);
+    });
+}
+
+function stopCrashWatcher() {
+    if (crashDebounceTimer) {
+        clearTimeout(crashDebounceTimer);
+        crashDebounceTimer = null;
+    }
+    if (crashWatcher) {
+        crashWatcher.close();
+        crashWatcher = null;
+    }
+}
 
 /**
  * Wait for the dev server to respond on its port.
@@ -77,7 +128,8 @@ function getBackoffDelay(restartCount: number): number {
 }
 
 /**
- * Handle process exit — auto-restart with exponential backoff if enabled.
+ * Handle process exit — attempt one auto-restart, then switch to file-watch
+ * mode so the server restarts as soon as the agent (or user) saves a fix.
  */
 function attachExitHandler(child: ResultPromise) {
     child.catch(async (error) => {
@@ -91,20 +143,28 @@ function attachExitHandler(child: ResultPromise) {
         if (!autoRestartEnabled) return;
 
         state.restartCount++;
-        const delay = getBackoffDelay(state.restartCount);
-        awel.log(`Auto-restarting dev server in ${delay}ms (attempt ${state.restartCount})...`);
-        await new Promise(r => setTimeout(r, delay));
 
-        // Check we're still in crashed state (user may have manually restarted)
-        if (state.status !== 'crashed') return;
+        // First crash: try one immediate auto-restart (could be a transient issue)
+        if (state.restartCount <= 1) {
+            const delay = getBackoffDelay(state.restartCount);
+            awel.log(`Auto-restarting dev server in ${delay}ms (attempt ${state.restartCount})...`);
+            await new Promise(r => setTimeout(r, delay));
 
-        try {
-            await doSpawn();
-            awel.log('Dev server auto-restarted successfully.');
-        } catch (err) {
-            const msg = err instanceof Error ? err.message : String(err);
-            awel.error(`Auto-restart failed: ${msg}`);
+            if (state.status !== 'crashed') return;
+
+            try {
+                await doSpawn();
+                awel.log('Dev server auto-restarted successfully.');
+                return;
+            } catch (err) {
+                const msg = err instanceof Error ? err.message : String(err);
+                awel.error(`Auto-restart failed: ${msg}`);
+            }
         }
+
+        // Repeated crashes: stop retrying blindly, watch for file changes instead
+        awel.log('Watching for file changes to restart dev server...');
+        startCrashWatcher();
     });
 }
 
@@ -112,6 +172,7 @@ function attachExitHandler(child: ResultPromise) {
  * Internal spawn + health-check routine.
  */
 async function doSpawn(): Promise<void> {
+    stopCrashWatcher();
     state.status = 'starting';
     const child = spawn(state.port, state.cwd);
     state.process = child;

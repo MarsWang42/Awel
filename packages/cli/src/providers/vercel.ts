@@ -67,7 +67,10 @@ Inspector Context:
 - CRITICAL: Focus your changes on the specific selected tag, NOT the entire parent component. The rendered HTML attributes help you locate the exact JSX element in the source code.
 - Use the parent component source code only as context to find and modify the specific tag.
 - Prioritize addressing what the user sees: if props are undefined/null, investigate why.
-- Reference the specific line numbers from the context when making edits.`;
+- Reference the specific line numbers from the context when making edits.
+
+Language:
+- IMPORTANT: Always respond in the same language the user writes in. If the user writes in Chinese, respond in Chinese. If the user writes in English, respond in English. Match the user's language throughout the conversation.`;
 
 /** Detects files Claude Code uses for plan output (.claude/plans/*.md, plan.md) */
 function isPlanFile(filePath: string): boolean {
@@ -105,6 +108,7 @@ function createModel(modelId: string, providerType: VercelProviderType, cwd?: st
             permissionMode: 'acceptEdits',
             streamingInput: 'always',
             maxTurns: 25,
+            appendSystemPrompt: 'IMPORTANT: Always respond in the same language the user writes in. If the user writes in Chinese, respond in Chinese. If the user writes in English, respond in English. Match the user\'s language throughout the conversation.',
         });
     } else if (providerType === 'anthropic') {
         const anthropic = createAnthropic({});

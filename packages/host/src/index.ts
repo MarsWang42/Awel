@@ -9,7 +9,7 @@
  * The port is configured to match the AWEL_PORT in packages/cli/src/config.ts
  */
 
-import { SIDEBAR_STATE_KEY } from './state.js';
+import { SIDEBAR_STATE_KEY, setResolvedTheme } from './state.js';
 import {
   consoleEntries,
   consoleHasUnviewed,
@@ -111,6 +111,9 @@ window.addEventListener('message', (event) => {
   }
   if (event.data?.type === 'AWEL_REQUEST_PAGE_CONTEXT') {
     broadcastPageContext();
+  }
+  if (event.data?.type === 'AWEL_THEME') {
+    setResolvedTheme(event.data.theme);
   }
 });
 

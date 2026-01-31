@@ -1,6 +1,6 @@
 // ─── Inspector Mode ───────────────────────────────────────────
 
-import { AWEL_PORT, INSPECTOR_WHEEL_THRESHOLD, isAwelElement } from './state.js';
+import { AWEL_PORT, INSPECTOR_WHEEL_THRESHOLD, isAwelElement, resolvedTheme } from './state.js';
 import { isSidebarVisible } from './overlay.js';
 
 // ─── State ────────────────────────────────────────────────────
@@ -623,7 +623,7 @@ function showInspectorToast(): void {
     el.style.opacity = '0';
     el.style.transform = 'translateX(-50%) translateY(-4px)';
     setTimeout(() => el.remove(), 150);
-  }, 2000);
+  }, 5000);
 }
 
 // ─── Comment Popup ────────────────────────────────────────────
@@ -631,7 +631,9 @@ function showInspectorToast(): void {
 function showCommentPopup(targetRect: DOMRect, displayName: string, fileLoc: string | null): void {
   removeCommentPopup();
 
-  const params = new URLSearchParams({ name: displayName });
+  const lang = navigator.language.startsWith('zh') ? 'zh' : 'en';
+  const theme = resolvedTheme;
+  const params = new URLSearchParams({ name: displayName, lang, theme });
   if (fileLoc) params.set('file', fileLoc);
 
   const iframe = document.createElement('iframe');
@@ -658,6 +660,7 @@ function showCommentPopup(targetRect: DOMRect, displayName: string, fileLoc: str
   left = Math.max(4, Math.min(left, window.innerWidth - width - 4));
   top = Math.max(4, Math.min(top, window.innerHeight - height - 4));
 
+  const isDark = theme === 'dark';
   iframe.style.cssText = `
     position: fixed;
     top: ${top}px;
@@ -665,10 +668,10 @@ function showCommentPopup(targetRect: DOMRect, displayName: string, fileLoc: str
     width: ${width}px;
     height: ${height}px;
     z-index: 999999;
-    border: 1px solid #27272a;
+    border: 1px solid ${isDark ? '#27272a' : '#d4d4d8'};
     border-radius: 10px;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
-    background: #18181b;
+    box-shadow: 0 8px 32px ${isDark ? 'rgba(0, 0, 0, 0.5)' : 'rgba(0, 0, 0, 0.15)'};
+    background: ${isDark ? '#18181b' : '#ffffff'};
   `;
 
   commentPopupEscHandler = (e: KeyboardEvent) => {

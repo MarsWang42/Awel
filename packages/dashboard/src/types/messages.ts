@@ -37,6 +37,7 @@ export interface ParsedMessage {
     planTitle?: string
     planContent?: string
     // Question fields
+    answered?: boolean
     questionId?: string
     questions?: Array<{
         question: string

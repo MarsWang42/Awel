@@ -59,5 +59,8 @@
     "sessionInitialized": "Session initialized",
     "attachedAlt": "Attached {{index}}",
     "clickToReattach": "Click to re-attach this {{level}}",
-    "toggleTheme": "Toggle theme"
+    "toggleTheme": "Toggle theme",
+    "openInEditor": "Open",
+    "editorLabel": "Editor",
+    "noEditorSelected": "Select editor"
 }

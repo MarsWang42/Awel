@@ -1,16 +1,38 @@
 import { Hono } from 'hono';
 
-const commentPopupHtml = `<!DOCTYPE html>
-<html lang="en">
+const i18n: Record<string, { placeholder: string; cancel: string; send: string }> = {
+  en: { placeholder: 'Describe what you want to change...', cancel: 'Cancel', send: 'Send' },
+  zh: { placeholder: '描述您想进行的更改...', cancel: '取消', send: '发送' },
+};
+
+function getCommentPopupHtml(lang: string, theme: string) {
+  const t = i18n[lang] ?? i18n.en;
+  const isDark = theme !== 'light';
+  return `<!DOCTYPE html>
+<html lang="en" data-theme="${isDark ? 'dark' : 'light'}">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
+  :root[data-theme="dark"] {
+    --bg: #18181b; --fg: #fafafa;
+    --title: #e4e4e7; --muted: #a1a1aa; --dim: #71717a; --sep: #52525b;
+    --input-bg: #09090b; --input-border: #27272a; --input-focus: #a1a1aa;
+    --btn-bg: #27272a; --btn-fg: #a1a1aa; --btn-hover-bg: #3f3f46; --btn-hover-fg: #fafafa;
+    --primary-bg: #fafafa; --primary-border: #fafafa; --primary-fg: #18181b; --primary-hover: #e4e4e7;
+  }
+  :root[data-theme="light"] {
+    --bg: #ffffff; --fg: #18181b;
+    --title: #27272a; --muted: #71717a; --dim: #a1a1aa; --sep: #d4d4d8;
+    --input-bg: #f4f4f5; --input-border: #d4d4d8; --input-focus: #71717a;
+    --btn-bg: #e4e4e7; --btn-fg: #71717a; --btn-hover-bg: #d4d4d8; --btn-hover-fg: #18181b;
+    --primary-bg: #18181b; --primary-border: #18181b; --primary-fg: #fafafa; --primary-hover: #27272a;
+  }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background: #18181b;
-    color: #fafafa;
+    background: var(--bg);
+    color: var(--fg);
     padding: 0 12px 12px;
     height: 100vh;
     display: flex;
@@ -31,7 +53,7 @@ const commentPopupHtml = `<!DOCTYPE html>
   .header-title {
     font-size: 12px;
     font-weight: 600;
-    color: #e4e4e7;
+    color: var(--title);
   }
   .element-info {
     margin-left: auto;
@@ -39,7 +61,7 @@ const commentPopupHtml = `<!DOCTYPE html>
     align-items: center;
     gap: 4px;
     font-size: 11px;
-    color: #a1a1aa;
+    color: var(--muted);
     overflow: hidden;
   }
   .element-name {
@@ -50,10 +72,10 @@ const commentPopupHtml = `<!DOCTYPE html>
     max-width: 100px;
   }
   .element-sep {
-    color: #52525b;
+    color: var(--sep);
   }
   .element-file {
-    color: #71717a;
+    color: var(--dim);
     font-family: ui-monospace, SFMono-Regular, monospace;
     font-size: 10px;
     white-space: nowrap;
@@ -64,10 +86,10 @@ const commentPopupHtml = `<!DOCTYPE html>
   textarea {
     flex: 1;
     width: 100%;
-    background: #09090b;
-    border: 1px solid #27272a;
+    background: var(--input-bg);
+    border: 1px solid var(--input-border);
     border-radius: 6px;
-    color: #fafafa;
+    color: var(--fg);
     font-family: inherit;
     font-size: 13px;
     padding: 8px 10px;
@@ -76,10 +98,10 @@ const commentPopupHtml = `<!DOCTYPE html>
     transition: border-color 0.15s ease;
   }
   textarea:focus {
-    border-color: #a1a1aa;
+    border-color: var(--input-focus);
   }
   textarea::placeholder {
-    color: #71717a;
+    color: var(--dim);
   }
   .buttons {
     display: flex;
@@ -93,26 +115,26 @@ const commentPopupHtml = `<!DOCTYPE html>
     font-weight: 500;
     padding: 6px 14px;
     border-radius: 6px;
-    border: 1px solid #27272a;
+    border: 1px solid var(--input-border);
     cursor: pointer;
     transition: all 0.15s ease;
   }
   button:active { transform: scale(0.97); }
   .btn-close {
-    background: #27272a;
-    color: #a1a1aa;
+    background: var(--btn-bg);
+    color: var(--btn-fg);
   }
   .btn-close:hover {
-    background: #3f3f46;
-    color: #fafafa;
+    background: var(--btn-hover-bg);
+    color: var(--btn-hover-fg);
   }
   .btn-submit {
-    background: #fafafa;
-    border-color: #fafafa;
-    color: #18181b;
+    background: var(--primary-bg);
+    border-color: var(--primary-border);
+    color: var(--primary-fg);
   }
   .btn-submit:hover {
-    background: #e4e4e7;
+    background: var(--primary-hover);
   }
   .btn-submit:disabled {
     opacity: 0.4;
@@ -136,10 +158,10 @@ const commentPopupHtml = `<!DOCTYPE html>
     </div>
     <div class="element-info" id="elementInfo"></div>
   </div>
-  <textarea id="comment" placeholder="Describe what you want to change..." autofocus></textarea>
+  <textarea id="comment" placeholder="${t.placeholder}" autofocus></textarea>
   <div class="buttons">
-    <button class="btn-close" id="closeBtn">Cancel</button>
-    <button class="btn-submit" id="submitBtn" disabled>Send<kbd id="shortcutHint"></kbd></button>
+    <button class="btn-close" id="closeBtn">${t.cancel}</button>
+    <button class="btn-submit" id="submitBtn" disabled>${t.send}<kbd id="shortcutHint"></kbd></button>
   </div>
   <script>
     const params = new URLSearchParams(window.location.search);
@@ -198,12 +220,15 @@ const commentPopupHtml = `<!DOCTYPE html>
   </script>
 </body>
 </html>`;
+}
 
 export function createCommentPopupRoute() {
   const app = new Hono();
 
   app.get('/_awel/comment-popup', (c) => {
-    return c.html(commentPopupHtml);
+    const lang = c.req.query('lang') ?? 'en';
+    const theme = c.req.query('theme') ?? 'dark';
+    return c.html(getCommentPopupHtml(lang, theme));
   });
 
   return app;

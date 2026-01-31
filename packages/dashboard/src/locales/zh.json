@@ -59,5 +59,8 @@
     "sessionInitialized": "Agent 协作环境初始化完成",
     "attachedAlt": "附件资源 {{index}}",
     "clickToReattach": "点击以重新关联此 {{level}}",
-    "toggleTheme": "切换主题"
+    "toggleTheme": "切换主题",
+    "openInEditor": "打开",
+    "editorLabel": "编辑器",
+    "noEditorSelected": "选择编辑器"
 }

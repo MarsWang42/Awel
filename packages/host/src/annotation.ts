@@ -1,6 +1,5 @@
 // ─── Screenshot Annotation ────────────────────────────────────
 
-import { toPng } from 'html-to-image';
 import { isAwelElement } from './state.js';
 import { isSidebarVisible, openOverlay } from './overlay.js';
 
@@ -18,38 +17,75 @@ let annotationStartY = 0;
 let annotationSnapshots: ImageData[] = [];
 let annotationTextInput: HTMLInputElement | null = null;
 
+// ─── Screen Capture ──────────────────────────────────────────
+
+async function captureViewport(): Promise<string> {
+  const stream = await navigator.mediaDevices.getDisplayMedia({
+    // @ts-expect-error -- preferCurrentTab is supported in Chrome 94+
+    preferCurrentTab: true,
+    video: { displaySurface: 'browser' },
+    audio: false,
+  } as DisplayMediaStreamOptions);
+
+  const track = stream.getVideoTracks()[0];
+
+  try {
+    // Wait a frame for the stream to produce a valid frame
+    await new Promise(r => setTimeout(r, 100));
+
+    // Use ImageCapture if available for a crisp single frame,
+    // otherwise fall back to drawing a video element onto a canvas.
+    if (typeof ImageCapture !== 'undefined') {
+      const capture = new ImageCapture(track);
+      const bitmap = await capture.grabFrame();
+      const canvas = document.createElement('canvas');
+      canvas.width = bitmap.width;
+      canvas.height = bitmap.height;
+      const ctx = canvas.getContext('2d')!;
+      ctx.drawImage(bitmap, 0, 0);
+      bitmap.close();
+      return canvas.toDataURL('image/png');
+    }
+
+    // Fallback: draw video frame onto canvas
+    const video = document.createElement('video');
+    video.srcObject = stream;
+    video.muted = true;
+    await video.play();
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext('2d')!;
+    ctx.drawImage(video, 0, 0);
+    video.pause();
+    return canvas.toDataURL('image/png');
+  } finally {
+    track.stop();
+  }
+}
+
 // ─── Entry Point ──────────────────────────────────────────────
 
-export function startScreenshotAnnotation(): void {
-  // Hide all Awel UI
+export async function startScreenshotAnnotation(): Promise<void> {
+  // Hide all Awel UI before capture
   const hostEl = document.getElementById('awel-host');
   const sidebarEl = document.getElementById('awel-sidebar');
   if (hostEl) hostEl.style.display = 'none';
   if (sidebarEl) sidebarEl.style.display = 'none';
 
-  // Wait for render, then capture
-  setTimeout(() => {
-    toPng(document.body, {
-      cacheBust: true,
-      pixelRatio: window.devicePixelRatio,
-      filter: (node) => {
-        if (!(node instanceof HTMLElement)) return true;
-        const id = node.id;
-        return id !== 'awel-host' && id !== 'awel-sidebar';
-      },
-    }).then((dataUrl) => {
-      const img = new Image();
-      img.onload = () => {
-        showAnnotationOverlay(dataUrl, img.naturalWidth, img.naturalHeight);
-      };
-      img.src = dataUrl;
-    }).catch((err) => {
-      console.error('[Awel] Screenshot capture failed:', err);
-      // Restore UI on failure
-      if (hostEl) hostEl.style.display = '';
-      if (sidebarEl) sidebarEl.style.display = '';
-    });
-  }, 100);
+  try {
+    const dataUrl = await captureViewport();
+    const img = new Image();
+    img.onload = () => {
+      showAnnotationOverlay(dataUrl, img.naturalWidth, img.naturalHeight);
+    };
+    img.src = dataUrl;
+  } catch (err) {
+    console.error('[Awel] Screenshot capture failed:', err);
+    // Restore UI on failure
+    if (hostEl) hostEl.style.display = '';
+    if (sidebarEl) sidebarEl.style.display = '';
+  }
 }
 
 // ─── Overlay ──────────────────────────────────────────────────

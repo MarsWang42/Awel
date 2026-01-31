@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { X, FileCode, FilePlus } from 'lucide-react'
+import { X, FileCode, FilePlus, ExternalLink } from 'lucide-react'
 import * as Diff from 'diff'
 
 export interface FileDiff {
@@ -16,9 +16,50 @@ interface DiffModalProps {
     onClose: () => void
 }
 
+const EDITORS = [
+    { id: 'vscode', name: 'VS Code', url: (path: string) => `vscode://file/${path}` },
+    { id: 'cursor', name: 'Cursor', url: (path: string) => `cursor://file/${path}` },
+    { id: 'windsurf', name: 'Windsurf', url: (path: string) => `windsurf://file/${path}` },
+    { id: 'zed', name: 'Zed', url: (path: string) => `zed://file/${path}` },
+    { id: 'sublime', name: 'Sublime Text', url: (path: string) => `subl://open?url=file:///${path}` },
+    { id: 'jetbrains', name: 'JetBrains', url: (path: string) => `jetbrains://open?file=${path}` },
+] as const
+
+const EDITOR_STORAGE_KEY = 'awel-preferred-editor'
+
+function getStoredEditor(): string {
+    try { return localStorage.getItem(EDITOR_STORAGE_KEY) ?? '' } catch { return '' }
+}
+
+function storeEditor(id: string) {
+    try { localStorage.setItem(EDITOR_STORAGE_KEY, id) } catch { /* noop */ }
+}
+
 export function DiffModal({ diffs, onClose }: DiffModalProps) {
     const { t } = useTranslation()
     const [selectedIndex, setSelectedIndex] = useState(0)
+    const [editorId, setEditorId] = useState(getStoredEditor)
+    const [projectCwd, setProjectCwd] = useState<string | null>(null)
+
+    useEffect(() => {
+        fetch('/api/project-info')
+            .then(r => r.json())
+            .then(data => setProjectCwd(data.projectCwd))
+            .catch(() => {})
+    }, [])
+
+    const handleEditorChange = useCallback((id: string) => {
+        setEditorId(id)
+        storeEditor(id)
+    }, [])
+
+    const handleOpenInEditor = useCallback(() => {
+        if (!projectCwd || !editorId) return
+        const editor = EDITORS.find(e => e.id === editorId)
+        if (!editor) return
+        const absolutePath = `${projectCwd}/${diffs[selectedIndex].relativePath}`
+        window.open(editor.url(absolutePath), '_self')
+    }, [projectCwd, editorId, diffs, selectedIndex])
 
     const selectedFile = diffs[selectedIndex]
     const patch = Diff.structuredPatch(
@@ -117,8 +158,34 @@ export function DiffModal({ diffs, onClose }: DiffModalProps) {
                     </div>
 
                     {/* Diff pane */}
-                    <div className="flex-1 overflow-auto">
-                        <div className="font-mono text-xs leading-5">
+                    <div className="flex-1 overflow-auto flex flex-col">
+                        {/* File path bar with editor controls */}
+                        <div className="flex items-center justify-between px-4 py-1.5 border-b border-border/50 bg-muted/30 flex-shrink-0">
+                            <span className="text-xs text-muted-foreground font-mono truncate mr-4">
+                                {selectedFile.relativePath}
+                            </span>
+                            <div className="flex items-center gap-1.5 flex-shrink-0">
+                                <select
+                                    value={editorId}
+                                    onChange={e => handleEditorChange(e.target.value)}
+                                    className="text-xs bg-background border border-border rounded px-1.5 py-0.5 text-foreground outline-none"
+                                >
+                                    <option value="" disabled>{t('noEditorSelected')}</option>
+                                    {EDITORS.map(e => (
+                                        <option key={e.id} value={e.id}>{e.name}</option>
+                                    ))}
+                                </select>
+                                <button
+                                    onClick={handleOpenInEditor}
+                                    disabled={!editorId || !projectCwd}
+                                    className="flex items-center gap-1 text-xs px-2 py-0.5 rounded border border-border bg-background text-foreground hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                                >
+                                    <ExternalLink className="w-3 h-3" />
+                                    {t('openInEditor')}
+                                </button>
+                            </div>
+                        </div>
+                        <div className="font-mono text-xs leading-5 overflow-auto flex-1">
                             {patch.hunks.length === 0 ? (
                                 <div className="p-4 text-muted-foreground">{t('noChanges')}</div>
                             ) : (

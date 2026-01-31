@@ -19,11 +19,12 @@ interface QuestionMessageProps {
     questions: Question[]
     onAnswer: (questionId: string, answers: Record<string, string[]>) => void
     disabled?: boolean
+    answered?: boolean
 }
 
-export function QuestionMessage({ questionId, questions, onAnswer, disabled }: QuestionMessageProps) {
+export function QuestionMessage({ questionId, questions, onAnswer, disabled, answered }: QuestionMessageProps) {
     const { t } = useTranslation()
-    const [submitted, setSubmitted] = useState(false)
+    const [submitted, setSubmitted] = useState(!!answered)
     const inactive = submitted || !!disabled
     const [activeTab, setActiveTab] = useState(0)
     // selections: questionIndex -> array of selected option indices

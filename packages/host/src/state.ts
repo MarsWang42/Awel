@@ -10,6 +10,24 @@ export const CONSOLE_STACK_MAX = 1000;
 
 export const INSPECTOR_WHEEL_THRESHOLD = 80;
 
+// ─── Theme State ─────────────────────────────────────────────
+
+function getInitialTheme(): 'light' | 'dark' {
+  try {
+    const stored = localStorage.getItem('awel-theme');
+    if (stored === 'light' || stored === 'dark') return stored;
+  } catch { /* ignore */ }
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
+
+export let resolvedTheme: 'light' | 'dark' = getInitialTheme();
+
+export function setResolvedTheme(t: 'light' | 'dark'): void {
+  resolvedTheme = t;
+  const host = document.getElementById('awel-host');
+  if (host) host.dataset.theme = t;
+}
+
 // ─── Types ────────────────────────────────────────────────────
 
 export interface SourceFrame {

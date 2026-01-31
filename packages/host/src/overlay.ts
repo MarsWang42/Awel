@@ -3,6 +3,7 @@
 import {
   DASHBOARD_URL,
   SIDEBAR_STATE_KEY,
+  resolvedTheme,
 } from './state.js';
 import {
   consoleEntries,
@@ -18,6 +19,22 @@ let iframeOverlay: HTMLDivElement | null = null;
 const triggerStyles = `
   :host {
     all: initial;
+  }
+
+  :host([data-theme="dark"]) {
+    --bg: #18181b; --border: #27272a; --fg: #fafafa;
+    --hover-bg: #27272a; --hover-border: #3f3f46;
+    --active-bg: #3f3f46; --active-border: #a1a1aa;
+    --shadow: rgba(0, 0, 0, 0.4);
+    --dot-ring: #18181b;
+  }
+
+  :host([data-theme="light"]) {
+    --bg: #ffffff; --border: #d4d4d8; --fg: #18181b;
+    --hover-bg: #f4f4f5; --hover-border: #a1a1aa;
+    --active-bg: #e4e4e7; --active-border: #71717a;
+    --shadow: rgba(0, 0, 0, 0.1);
+    --dot-ring: #ffffff;
   }
 
   .awel-controls {
@@ -36,14 +53,14 @@ const triggerStyles = `
     align-items: center;
     justify-content: center;
     gap: 8px;
-    background: #18181b;
-    border: 1px solid #27272a;
-    color: #fafafa;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--fg);
     font-family: inherit;
     font-size: 13px;
     font-weight: 500;
     cursor: pointer;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    box-shadow: 0 4px 12px var(--shadow);
     transition: all 0.15s ease;
   }
 
@@ -65,8 +82,8 @@ const triggerStyles = `
   }
 
   .awel-trigger:hover, .awel-inspector-btn:hover, .awel-screenshot-btn:hover {
-    background: #27272a;
-    border-color: #3f3f46;
+    background: var(--hover-bg);
+    border-color: var(--hover-border);
   }
 
   .awel-trigger:active, .awel-inspector-btn:active, .awel-screenshot-btn:active {
@@ -74,9 +91,9 @@ const triggerStyles = `
   }
 
   .awel-inspector-btn.active {
-    background: #3f3f46;
-    border-color: #a1a1aa;
-    color: #fafafa;
+    background: var(--active-bg);
+    border-color: var(--active-border);
+    color: var(--fg);
   }
 
   .awel-icon {
@@ -95,7 +112,7 @@ const triggerStyles = `
     width: 8px;
     height: 8px;
     border-radius: 50%;
-    border: 2px solid #18181b;
+    border: 2px solid var(--dot-ring);
     pointer-events: none;
     transition: background 0.15s ease;
     display: none;
@@ -241,6 +258,7 @@ export function createTriggerButton(opts: {
   // so React/Next.js error recovery doesn't remove it when replacing body content.
   const host = document.createElement('div');
   host.id = 'awel-host';
+  host.dataset.theme = resolvedTheme;
   document.documentElement.appendChild(host);
 
   // Attach shadow root (store ref for inspector button updates)
