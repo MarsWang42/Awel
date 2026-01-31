@@ -3,6 +3,7 @@ import { startServer } from './server.js';
 import { AWEL_PORT, USER_APP_PORT } from './config.js';
 import { setVerbose } from './verbose.js';
 import { ensureBabelPlugin } from './babel-setup.js';
+import { ensureProvider } from './onboarding.js';
 import { awel } from './logger.js';
 import { spawnDevServer } from './subprocess.js';
 
@@ -20,6 +21,7 @@ program
         const targetPort = parseInt(options.port, 10);
         if (options.verbose) setVerbose(true);
 
+        await ensureProvider(process.cwd());
         await ensureBabelPlugin(process.cwd());
 
         awel.log('🌟 Starting Awel...');

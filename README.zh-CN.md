@@ -12,8 +12,16 @@
 # 如果你已经在一个 Next.js 项目中，可以跳过这一步
 npx create-next-app@latest my-app && cd my-app
 
+# 至少配置一个 AI 服务商（任选其一）：
+export ANTHROPIC_API_KEY="sk-ant-..."   # Anthropic API
+export OPENAI_API_KEY="sk-..."          # OpenAI
+export GOOGLE_GENERATIVE_AI_API_KEY="..." # Google AI
+# 或安装 Claude CLI：https://docs.anthropic.com/en/docs/claude-code
+
 npx awel dev
 ```
+
+Awel 需要至少一个已配置的服务商才能运行。完整列表见[支持的模型](#支持的模型)。
 
 Awel 会在端口 3001 启动，并代理运行在端口 3000 的 Next.js 开发服务器。打开 `http://localhost:3001` 即可看到带有 Awel 浮层的应用。
 

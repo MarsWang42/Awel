@@ -12,8 +12,16 @@ AI-powered development overlay for Next.js. Awel runs a proxy in front of your d
 # Skip if you're already in a Next.js app
 npx create-next-app@latest my-app && cd my-app
 
+# Set up at least one AI provider (pick one):
+export ANTHROPIC_API_KEY="sk-ant-..."   # Anthropic API
+export OPENAI_API_KEY="sk-..."          # OpenAI
+export GOOGLE_GENERATIVE_AI_API_KEY="..." # Google AI
+# Or install the Claude CLI: https://docs.anthropic.com/en/docs/claude-code
+
 npx awel dev
 ```
+
+Awel needs at least one configured provider to function. See [Supported Models](#supported-models) for the full list.
 
 This starts Awel on port 3001 and proxies your Next.js dev server on port 3000. Open `http://localhost:3001` to see your app with the Awel overlay.
 

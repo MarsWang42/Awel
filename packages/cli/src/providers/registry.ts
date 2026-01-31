@@ -69,6 +69,61 @@ function isClaudeBinaryAvailable(): boolean {
     return _claudeBinaryAvailable;
 }
 
+// ─── Provider Availability ────────────────────────────────────
+
+export const PROVIDER_LABELS: Record<string, string> = {
+    'claude-code': 'Claude Code',
+    anthropic: 'Anthropic API',
+    openai: 'OpenAI',
+    'google-ai': 'Google AI',
+    'vercel-gateway': 'Vercel AI Gateway',
+    qwen: 'Qwen',
+    minimax: 'MiniMax',
+};
+
+export interface ProviderAvailability {
+    provider: string;
+    label: string;
+    available: boolean;
+    envVar: string | null;
+}
+
+/**
+ * Returns deduplicated provider availability info.
+ * Checks each provider once (claude-code via binary check, others via env var).
+ */
+export function getAvailableProviders(): ProviderAvailability[] {
+    const seen = new Set<string>();
+    const result: ProviderAvailability[] = [];
+
+    for (const model of MODEL_CATALOG) {
+        if (seen.has(model.provider)) continue;
+        seen.add(model.provider);
+
+        const label = PROVIDER_LABELS[model.provider] ?? model.provider;
+
+        if (model.provider === 'claude-code') {
+            result.push({
+                provider: model.provider,
+                label,
+                available: isClaudeBinaryAvailable(),
+                envVar: null,
+            });
+            continue;
+        }
+
+        const envKey = PROVIDER_ENV_KEYS[model.provider];
+        result.push({
+            provider: model.provider,
+            label,
+            available: envKey ? !!process.env[envKey] : true,
+            envVar: envKey ?? null,
+        });
+    }
+
+    return result;
+}
+
 // ─── Provider Resolution ─────────────────────────────────────
 
 export function resolveProvider(modelId: string): { provider: StreamProvider; modelProvider: string } {

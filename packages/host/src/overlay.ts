@@ -54,7 +54,8 @@ const triggerStyles = `
     justify-content: center;
     gap: 8px;
     background: var(--bg);
-    border: 1px solid var(--border);
+    border: none;
+    border-radius: 8px;
     color: var(--fg);
     font-family: inherit;
     font-size: 13px;
@@ -66,24 +67,18 @@ const triggerStyles = `
 
   .awel-trigger {
     padding: 10px 16px;
-    border-radius: 8px 0 0 8px;
   }
 
   .awel-inspector-btn {
     padding: 10px 12px;
-    border-radius: 0;
-    border-left: none;
   }
 
   .awel-screenshot-btn {
     padding: 10px 12px;
-    border-radius: 0 8px 8px 0;
-    border-left: none;
   }
 
   .awel-trigger:hover, .awel-inspector-btn:hover, .awel-screenshot-btn:hover {
     background: var(--hover-bg);
-    border-color: var(--hover-border);
   }
 
   .awel-trigger:active, .awel-inspector-btn:active, .awel-screenshot-btn:active {
@@ -92,7 +87,6 @@ const triggerStyles = `
 
   .awel-inspector-btn.active {
     background: var(--active-bg);
-    border-color: var(--active-border);
     color: var(--fg);
   }
 

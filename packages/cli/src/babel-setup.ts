@@ -1,6 +1,7 @@
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
+import { existsSync, readFileSync, writeFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { readAwelConfig, writeAwelConfig } from './awel-config.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -13,10 +14,6 @@ const BABEL_CONFIG_FILES = [
     '.babelrc.js',
     '.babelrc.cjs',
 ];
-
-interface AwelConfig {
-    babelPlugin?: boolean;
-}
 
 function getPluginPath(): string {
     // babel-plugin-awel-source.cjs lives at the root of the cli package,
@@ -41,24 +38,6 @@ function findExistingBabelConfig(projectCwd: string): string | null {
     }
     if (hasPackageJsonBabelKey(projectCwd)) return 'package.json';
     return null;
-}
-
-function readAwelConfig(projectCwd: string): AwelConfig {
-    const configPath = join(projectCwd, '.awel', 'config.json');
-    if (!existsSync(configPath)) return {};
-    try {
-        return JSON.parse(readFileSync(configPath, 'utf-8'));
-    } catch {
-        return {};
-    }
-}
-
-function writeAwelConfig(projectCwd: string, config: AwelConfig): void {
-    const dir = join(projectCwd, '.awel');
-    if (!existsSync(dir)) {
-        mkdirSync(dir, { recursive: true });
-    }
-    writeFileSync(join(dir, 'config.json'), JSON.stringify(config, null, 2) + '\n', 'utf-8');
 }
 
 // ANSI 256-color helpers — darker shades that stay visible on light backgrounds
