@@ -171,10 +171,19 @@ export function useConsole(selectedModel: string, onReviewDiffs?: (diffs: import
                             } as ParsedMessage)
                         }
                     }
-                    // Mark question messages as answered if they're not the last message
-                    for (let j = 0; j < parsedMessages.length - 1; j++) {
-                        if (parsedMessages[j].type === 'question') {
-                            parsedMessages[j].answered = true
+                    // Collect question IDs that were answered (from persisted question_answered events)
+                    const answeredIds = new Set<string>()
+                    for (const item of data.history) {
+                        if (item.eventType === 'question_answered') {
+                            try {
+                                const d = JSON.parse(item.data)
+                                if (d.questionId) answeredIds.add(d.questionId)
+                            } catch {}
+                        }
+                    }
+                    for (const msg of parsedMessages) {
+                        if (msg.type === 'question' && msg.questionId && answeredIds.has(msg.questionId)) {
+                            msg.answered = true
                         }
                     }
 
@@ -531,6 +540,16 @@ export function useConsole(selectedModel: string, onReviewDiffs?: (diffs: import
                 ? { ...m, answered: true }
                 : m
         ))
+
+        // Persist answered state so it survives page refresh
+        fetch('/api/chat/history', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                eventType: 'question_answered',
+                data: JSON.stringify({ questionId: _questionId }),
+            }),
+        }).catch(() => {})
 
         // Build a readable summary of the user's selections
         const lines = Object.entries(answers).map(([header, selected]) =>

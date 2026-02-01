@@ -6,7 +6,10 @@ import { ConfirmDialog } from './components/ui/confirm-dialog'
 import { Console } from './components/Console'
 import { ModelSelector } from './components/ModelSelector'
 import { DiffModal, type FileDiff } from './components/DiffModal'
+import { CreationView } from './components/CreationView'
 import { useTheme } from './hooks/useTheme'
+
+const IS_CREATION_MODE = !!(window as any).__AWEL_CREATION_MODE__
 
 function App() {
     const { t } = useTranslation()
@@ -60,6 +63,15 @@ function App() {
 
     const handleToggleTheme = () => {
         setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')
+    }
+
+    if (IS_CREATION_MODE) {
+        return (
+            <CreationView
+                initialModel={selectedModel}
+                onModelChange={handleModelChange}
+            />
+        )
     }
 
     return (

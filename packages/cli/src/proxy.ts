@@ -1,10 +1,51 @@
+import { readFileSync, existsSync } from 'fs';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+/**
+ * Reads the dashboard index.html and injects the creation mode flag.
+ * Returns the modified HTML or null if the file doesn't exist.
+ */
+function getCreationModeHtml(): string | null {
+    const indexPath = join(__dirname, '../dashboard/index.html');
+    if (!existsSync(indexPath)) return null;
+    let html = readFileSync(indexPath, 'utf-8');
+    const creationScript = `<script>window.__AWEL_CREATION_MODE__=true</script>`;
+    if (html.includes('</head>')) {
+        html = html.replace('</head>', `${creationScript}</head>`);
+    } else {
+        html = creationScript + html;
+    }
+    return html;
+}
+
 /**
  * Creates proxy middleware that forwards requests to the target app
  * and injects the Awel host script into HTML responses.
  */
-export function createProxyMiddleware(targetPort: number, projectCwd?: string) {
+export function createProxyMiddleware(targetPort: number, projectCwd?: string, isFresh?: () => boolean) {
     return async (c: any, _next: () => Promise<void>) => {
         const url = new URL(c.req.url);
+
+        // In creation mode, serve the dashboard at all HTML navigation requests.
+        // Non-HTML requests (JS, CSS, HMR) still proxy through to the dev server.
+        if (isFresh?.()) {
+            const accept = c.req.header('accept') || '';
+            const isNavigation = accept.includes('text/html');
+            if (isNavigation) {
+                const html = getCreationModeHtml();
+                if (html) {
+                    return new Response(html, {
+                        status: 200,
+                        headers: { 'Content-Type': 'text/html; charset=utf-8' },
+                    });
+                }
+            }
+        }
+
         const targetUrl = `http://localhost:${targetPort}${url.pathname}${url.search}`;
 
         try {
@@ -22,7 +63,7 @@ export function createProxyMiddleware(targetPort: number, projectCwd?: string) {
 
             const contentType = response.headers.get('content-type') || '';
 
-            // If it's HTML, inject our script
+            // If it's HTML, inject the Awel host script
             if (contentType.includes('text/html')) {
                 let html = await response.text();
 
@@ -31,13 +72,9 @@ export function createProxyMiddleware(targetPort: number, projectCwd?: string) {
                     ? `<script>window.__AWEL_PROJECT_CWD__=${JSON.stringify(projectCwd)}</script>`
                     : '';
                 // Constrain Next.js error overlay stacking context below Awel's UI.
-                // Covers both legacy and modern Next.js error overlay custom elements.
                 const awelOverlayStyle = `<style id="awel-overlay-fix">nextjs-portal, nextjs-portal-root, next-error-overlay, nextjs-dev-tools { position: relative !important; z-index: 999997 !important; }</style>`;
                 const scriptTag = `${awelOverlayStyle}${cwdScript}<script src="/_awel/host.js"></script>`;
 
-                // Inject into <head> so the script loads early — even on error pages
-                // where the body might be minimal or replaced by Next.js error recovery.
-                // Fall back to </body> then </html> if <head> isn't found.
                 if (html.includes('</head>')) {
                     html = html.replace('</head>', `${scriptTag}</head>`);
                 } else if (html.includes('</body>')) {
@@ -62,7 +99,6 @@ export function createProxyMiddleware(targetPort: number, projectCwd?: string) {
             // For non-HTML responses, pass through as-is but clean up encoding headers
             const body = await response.arrayBuffer();
             const responseHeaders = new Headers(response.headers);
-            // Remove content-encoding since we've already decoded the response
             responseHeaders.delete('content-encoding');
             responseHeaders.delete('content-length');
 

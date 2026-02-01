@@ -62,5 +62,14 @@
     "toggleTheme": "切换主题",
     "openInEditor": "打开",
     "editorLabel": "编辑器",
-    "noEditorSelected": "选择编辑器"
+    "noEditorSelected": "选择编辑器",
+    "creationHeading": "你想构建什么？",
+    "creationSubheading": "描述你的应用，Awel 将为你创建。",
+    "creationPlaceholder": "描述你想构建的应用...",
+    "creationSuccess": "你的应用已就绪！",
+    "creationRedirecting": "正在跳转到你的应用...",
+    "creationChipEcommerce": "电商平台",
+    "creationChipBlog": "博客平台",
+    "creationChipDashboard": "管理后台",
+    "creationChipPortfolio": "个人作品集"
 }

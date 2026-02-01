@@ -8,6 +8,7 @@ import { createInspectorRoute } from './inspector.js';
 import { createCommentPopupRoute } from './comment-popup.js';
 import { trackProxySocket } from './devserver.js';
 import { getMimeType } from './config.js';
+import { markProjectReady } from './awel-config.js';
 import { awel } from './logger.js';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
@@ -20,6 +21,7 @@ interface ServerOptions {
   awelPort: number;
   targetPort: number;
   projectCwd: string;
+  fresh?: boolean;
 }
 
 /**
@@ -45,8 +47,10 @@ function serveDashboardIndex(): string | null {
   return readFileSync(indexPath, 'utf-8');
 }
 
-export async function startServer({ awelPort, targetPort, projectCwd }: ServerOptions) {
+export async function startServer({ awelPort, targetPort, projectCwd, fresh }: ServerOptions) {
   const app = new Hono();
+
+  let isFresh = fresh ?? false;
 
   // Create a proxy for WebSocket connections
   const wsProxy = httpProxy.createProxyServer({
@@ -64,7 +68,7 @@ export async function startServer({ awelPort, targetPort, projectCwd }: ServerOp
   });
 
   // Mount agent API routes
-  app.route('/', createAgentRoute(projectCwd, targetPort));
+  app.route('/', createAgentRoute(projectCwd, targetPort, () => isFresh));
 
   // Mount undo API routes
   app.route('/', createUndoRoute(projectCwd));
@@ -74,6 +78,17 @@ export async function startServer({ awelPort, targetPort, projectCwd }: ServerOp
 
   // Serve the comment popup page (loaded in an iframe by the host script)
   app.route('/', createCommentPopupRoute());
+
+  // ─── Project Status Endpoints ─────────────────────────────
+  app.get('/api/project/status', (c) => {
+    return c.json({ fresh: isFresh });
+  });
+
+  app.post('/api/project/mark-ready', (c) => {
+    markProjectReady(projectCwd);
+    isFresh = false;
+    return c.json({ success: true });
+  });
 
   // Serve the host script
   app.get('/_awel/host.js', async (c) => {
@@ -111,7 +126,7 @@ export async function startServer({ awelPort, targetPort, projectCwd }: ServerOp
   });
 
   // Proxy all other requests to the target app
-  app.all('*', createProxyMiddleware(targetPort, projectCwd));
+  app.all('*', createProxyMiddleware(targetPort, projectCwd, () => isFresh));
 
   // Create the HTTP server with Hono
   const server = serve({

@@ -8,6 +8,8 @@ export interface ProviderConfig {
     targetPort: number;
     /** When aborted, the provider should stop the LLM stream and exit early. */
     signal?: AbortSignal;
+    /** When true, the agent uses a creation-mode system prompt for building new apps. */
+    creationMode?: boolean;
 }
 
 export interface StreamProvider {

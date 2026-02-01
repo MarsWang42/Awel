@@ -27,6 +27,7 @@
         "ai": "^6.0.57",
         "ai-sdk-provider-claude-code": "^3.3.3",
         "ai-sdk-provider-gemini-cli": "^2.0.1",
+        "@clack/prompts": "^0.9.1",
         "class-variance-authority": "^0.7.1",
         "clsx": "^2.1.1",
         "commander": "^12.1.0",

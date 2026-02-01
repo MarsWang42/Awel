@@ -4,6 +4,8 @@ import { join } from 'path';
 export interface AwelConfig {
     babelPlugin?: boolean;
     onboarded?: boolean;
+    fresh?: boolean;
+    createdAt?: string;
 }
 
 export function readAwelConfig(projectCwd: string): AwelConfig {
@@ -22,4 +24,14 @@ export function writeAwelConfig(projectCwd: string, config: AwelConfig): void {
         mkdirSync(dir, { recursive: true });
     }
     writeFileSync(join(dir, 'config.json'), JSON.stringify(config, null, 2) + '\n', 'utf-8');
+}
+
+export function isProjectFresh(projectCwd: string): boolean {
+    return readAwelConfig(projectCwd).fresh === true;
+}
+
+export function markProjectReady(projectCwd: string): void {
+    const config = readAwelConfig(projectCwd);
+    config.fresh = false;
+    writeAwelConfig(projectCwd, config);
 }

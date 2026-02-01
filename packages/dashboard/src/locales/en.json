@@ -62,5 +62,14 @@
     "toggleTheme": "Toggle theme",
     "openInEditor": "Open",
     "editorLabel": "Editor",
-    "noEditorSelected": "Select editor"
+    "noEditorSelected": "Select editor",
+    "creationHeading": "What would you like to build?",
+    "creationSubheading": "Describe your app and Awel will create it for you.",
+    "creationPlaceholder": "Describe what you want to build...",
+    "creationSuccess": "Your app is ready!",
+    "creationRedirecting": "Redirecting to your app...",
+    "creationChipEcommerce": "E-commerce store",
+    "creationChipBlog": "Blog platform",
+    "creationChipDashboard": "Admin dashboard",
+    "creationChipPortfolio": "Portfolio site"
 }

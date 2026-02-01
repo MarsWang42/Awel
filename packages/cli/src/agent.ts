@@ -107,8 +107,9 @@ function setSSEHeaders(c: Context) {
 /**
  * Creates the agent API routes with SSE streaming.
  * @param projectCwd - The user's project directory (where they ran `awel dev`)
+ * @param isFresh - Getter for whether the project is in creation mode
  */
-export function createAgentRoute(projectCwd: string, targetPort: number) {
+export function createAgentRoute(projectCwd: string, targetPort: number, isFresh?: () => boolean) {
     const agent = new Hono();
 
     // ─── Model Catalog ───────────────────────────────────────
@@ -181,7 +182,7 @@ export function createAgentRoute(projectCwd: string, targetPort: number) {
             // Appending eagerly would leave orphan user messages in the session when
             // the stream is aborted or paused for user input, causing consecutive
             // user messages that trigger API 400 errors (especially with Anthropic).
-            provider.streamResponse(adapter, messages, { projectCwd, targetPort, signal })
+            provider.streamResponse(adapter, messages, { projectCwd, targetPort, signal, creationMode: isFresh?.() })
                 .then((responseMessages) => {
                     if (responseMessages.length > 0) {
                         appendUserMessage(userContent);
