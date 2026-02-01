@@ -157,7 +157,9 @@ function createModel(modelId: string, providerType: VercelProviderType, cwd?: st
         const anthropic = createAnthropic({});
         return anthropic(modelId);
     } else if (providerType === 'openai') {
-        const openai = createOpenAI({});
+        const openai = createOpenAI({
+            baseURL: process.env.OPENAI_BASE_URL,
+        });
         return openai(modelId);
     } else if (providerType === 'google-ai') {
         const google = createGoogleGenerativeAI({});
@@ -246,12 +248,17 @@ export function createVercelProvider(modelId: string, providerType: VercelProvid
                     ? undefined
                     : `${basePrompt}\n\nThe user's project directory is: ${config.projectCwd}`;
 
+                const maxOutputTokens = process.env.AWEL_MAX_OUTPUT_TOKENS
+                    ? parseInt(process.env.AWEL_MAX_OUTPUT_TOKENS, 10)
+                    : undefined;
+
                 const streamTextArgs = {
                     model,
                     ...(systemPrompt && { system: systemPrompt }),
                     messages,
                     tools,
                     ...(!isSelfContained && { stopWhen: stepCountIs(25) }),
+                    ...(maxOutputTokens && { maxOutputTokens }),
                     abortSignal: abortController.signal,
                 };
                 logEvent('stream:start', `model=${modelId} provider=${providerType} messages=${messages.length}`);

@@ -74,6 +74,13 @@ Awel uses the [Vercel AI SDK](https://sdk.vercel.ai) and supports multiple provi
 
 Switch models at any time from the dropdown in the dashboard header.
 
+### Additional Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| `OPENAI_BASE_URL` | Custom base URL for the OpenAI provider (e.g. a proxy or compatible API). Defaults to `https://api.openai.com/v1`. |
+| `AWEL_MAX_OUTPUT_TOKENS` | Maximum number of tokens the model can generate per response. Applies to all providers. |
+
 ## Agent Tools
 
 The AI agent has access to:

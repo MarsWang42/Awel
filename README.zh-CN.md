@@ -74,6 +74,13 @@ Awel 使用 [Vercel AI SDK](https://sdk.vercel.ai)，支持多个服务商。设
 
 可随时在面板顶部的下拉菜单中切换模型。
 
+### 额外环境变量
+
+| 变量 | 说明 |
+|------|------|
+| `OPENAI_BASE_URL` | OpenAI 服务商的自定义 Base URL（例如代理或兼容 API）。默认为 `https://api.openai.com/v1`。 |
+| `AWEL_MAX_OUTPUT_TOKENS` | 模型单次响应的最大生成 token 数。对所有服务商生效。 |
+
 ## 智能体工具
 
 AI 智能体可使用以下工具：
