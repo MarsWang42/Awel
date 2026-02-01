@@ -35,6 +35,9 @@ npm run build:host         # esbuild → dist/host/host.js (IIFE, minified)
 npm run build:dashboard    # Vite build → dist/dashboard/
 npm run dev                # CLI watch mode (tsc --watch)
 
+# Create a new project with Awel (scaffolds Next.js + marks for creation mode)
+npx awel create
+
 # Running Awel against a Next.js app
 npx awel dev               # Start on default ports (Awel:3001, app:3000)
 npx awel dev -p 4000       # Target app on port 4000
@@ -56,16 +59,16 @@ The core server and agent orchestration layer.
 
 | File | Purpose |
 |------|---------|
-| `src/index.ts` | CLI entry point (Commander.js). Defines `awel dev` command. |
-| `src/server.ts` | Hono app setup: mounts API routes, serves dashboard/host static files, proxies everything else to user's app. Handles WebSocket upgrades for HMR. |
+| `src/index.ts` | CLI entry point (Commander.js). Defines `awel dev` and `awel create` commands. |
+| `src/server.ts` | Hono app setup: mounts API routes, serves dashboard/host static files, proxies everything else to user's app. Handles WebSocket upgrades for HMR. Manages creation mode state and project status endpoints. |
 | `src/agent.ts` | Agent API routes: `POST /api/stream` (SSE streaming), `GET /api/history`, `GET /api/models`, plan approval endpoints. |
 | `src/session.ts` | Multi-turn conversation state. Model-aware session caching and message history preservation across model switches. |
 | `src/config.ts` | Port defaults (`AWEL_PORT`, `USER_APP_PORT`), MIME type mappings. |
 | `src/types.ts` | Shared type definitions. |
 | `src/providers/registry.ts` | Model catalog and provider resolution. Maps model IDs → providers. |
-| `src/providers/vercel.ts` | Core streaming implementation using Vercel AI SDK `streamText()`. Handles tool execution, SSE event emission, chat history management. |
-| `src/providers/types.ts` | Shared types: `StreamProvider`, `ModelDefinition`, `ProviderConfig`. |
-| `src/proxy.ts` | HTTP proxy middleware. Intercepts HTML responses to inject the host script (`/_awel/host.js`). |
+| `src/providers/vercel.ts` | Core streaming implementation using Vercel AI SDK `streamText()`. Handles tool execution, SSE event emission, chat history management. Uses a specialized creation system prompt when in creation mode. |
+| `src/providers/types.ts` | Shared types: `StreamProvider`, `ModelDefinition`, `ProviderConfig` (includes `creationMode` flag). |
+| `src/proxy.ts` | HTTP proxy middleware. Intercepts HTML responses to inject the host script (`/_awel/host.js`). In creation mode, serves the dashboard as a full-page app at `/` instead of proxying. |
 | `src/subprocess.ts` | Dev server process management: spawning via execa, health checks, auto-restart on crash, status tracking. |
 | `src/devserver.ts` | HMR WebSocket traffic pause/resume during agent streams. |
 | `src/undo.ts` | Session-based undo system. Snapshots files before modifications, stack-based LIFO rollback. |
@@ -76,6 +79,7 @@ The core server and agent orchestration layer.
 | `src/comment-popup.ts` | Comment popup handling. |
 | `src/logger.ts` | Logging utilities. |
 | `src/verbose.ts` | Verbose mode tracking. |
+| `src/awel-config.ts` | `.awel/config.json` read/write. `AwelConfig` interface includes `fresh` and `createdAt` fields for creation mode. Helpers: `isProjectFresh()`, `markProjectReady()`. |
 | `src/tools/` | Tool implementations available to the LLM (see below). |
 | `src/skills/` | Static skill files (e.g. `react-best-practices.md`), copied to dist at build time. |
 
@@ -124,7 +128,7 @@ React 18 SPA served at `/_awel/dashboard` by the CLI server.
 
 | File | Purpose |
 |------|---------|
-| `src/App.tsx` | Root component. Header with model selector, inspector toggle, controls. |
+| `src/App.tsx` | Root component. Detects `window.__AWEL_CREATION_MODE__` and renders `CreationView` (full-page) or the normal sidebar layout. |
 | `src/main.tsx` | React entry point. |
 | `src/i18n.ts` | i18n setup and locale configuration. |
 | `src/hooks/useConsole.ts` | Core state management. Manages message list, SSE stream consumption, plan/question handling. |
@@ -132,6 +136,7 @@ React 18 SPA served at `/_awel/dashboard` by the CLI server.
 | `src/services/sseParser.ts` | Parses SSE events from the server stream. |
 | `src/types/messages.ts` | Shared message and event type definitions. |
 | `src/components/Console.tsx` | Main chat interface component. |
+| `src/components/CreationView.tsx` | Full-page creation mode UI. Three phases: initial (heading + suggestion chips + input), building (streaming chat), success (auto-redirect to app). |
 | `src/components/ModelSelector.tsx` | Model selection dropdown (persists to localStorage). |
 | `src/components/ConsoleChips.tsx` | Console entry chips displayed above the input area. |
 | `src/components/DiffModal.tsx` | Diff review modal for file changes. |
@@ -180,6 +185,15 @@ User types in Dashboard UI
 - The undo system (`undo.ts`) snapshots files before each modification, allowing stack-based rollback of an entire agent session.
 - The subprocess manager (`subprocess.ts`) can spawn, monitor, and auto-restart the user's dev server.
 
+**Creation mode** (`awel create` → `awel dev`):
+- `awel create` uses `@clack/prompts` to prompt for a project name, runs `npx create-next-app@latest`, and writes `.awel/config.json` with `{ fresh: true }`.
+- `awel dev` reads `isProjectFresh()` at startup. When `fresh`, the server sets an in-memory `isFresh` flag.
+- The proxy intercepts all HTML navigation requests (`Accept: text/html`) and serves the dashboard directly at `/` with `window.__AWEL_CREATION_MODE__=true` injected. No host script injection. Non-HTML requests (JS, CSS, HMR) still proxy to the Next.js dev server.
+- `App.tsx` detects the flag and renders `CreationView` instead of the normal sidebar layout.
+- The agent uses `CREATION_SYSTEM_PROMPT` (in `vercel.ts`) which instructs it to clarify requirements via `AskUser`, generate a complete app, and verify it builds.
+- When the agent finishes (result SSE event with `success` subtype), `CreationView` calls `POST /api/project/mark-ready`, which writes `{ fresh: false }` to `.awel/config.json` and flips the in-memory flag. The UI shows a success screen and redirects to `/`.
+- After redirect, the proxy sees `isFresh=false` and behaves normally: proxies to Next.js with host script injection. If there are build errors, the user sees the Next.js error overlay with the Awel button available.
+
 ## Key Conventions
 
 - All packages use ES modules (`"type": "module"`). Use `.js` extensions in import paths (even for TypeScript sources).
@@ -187,3 +201,4 @@ User types in Dashboard UI
 - The CLI compiles with plain `tsc` (no bundler). Dashboard uses Vite. Host uses esbuild.
 - No test framework is currently set up.
 - Zod v4 is used for validation in the CLI package.
+- `@clack/prompts` is used for interactive CLI prompts in `awel create`.

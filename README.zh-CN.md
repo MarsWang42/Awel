@@ -8,16 +8,24 @@
 
 ## 快速开始
 
-```bash
-# 如果你已经在一个 Next.js 项目中，可以跳过这一步
-npx create-next-app@latest my-app && cd my-app
+### 创建新项目
 
+```bash
 # 至少配置一个 AI 服务商（任选其一）：
 export ANTHROPIC_API_KEY="sk-ant-..."   # Anthropic API
 export OPENAI_API_KEY="sk-..."          # OpenAI
 export GOOGLE_GENERATIVE_AI_API_KEY="..." # Google AI
 # 或安装 Claude CLI：https://docs.anthropic.com/en/docs/claude-code
 
+npx awel create
+```
+
+此命令会创建一个新的 Next.js 项目并标记为创建模式。按照提示 `cd` 进入项目目录并运行 `npx awel dev`。你会看到一个全屏创建界面，描述你想构建的应用——AI 智能体会为你生成整个应用，完成后自动切换到正常的 Awel 浮层模式。
+
+### 在已有项目中使用
+
+```bash
+cd my-existing-next-app
 npx awel dev
 ```
 
@@ -25,10 +33,11 @@ Awel 需要至少一个已配置的服务商才能运行。完整列表见[支�
 
 Awel 会在端口 3001 启动，并代理运行在端口 3000 的 Next.js 开发服务器。打开 `http://localhost:3001` 即可看到带有 Awel 浮层的应用。
 
-### 选项
+### 命令
 
 ```
-awel dev [options]
+awel create              创建一个带有 Awel 的新 Next.js 项目
+awel dev [options]       启动带有 Awel 浮层的开发服务器
 
   -p, --port <port>    目标应用端口（默认：3000）
   -v, --verbose        将 LLM 流式事件输出到 stderr
@@ -94,6 +103,7 @@ AI 智能体可使用以下工具：
 - **Diff 审查** — 在接受变更前查看所有文件修改的摘要
 - **深色模式** — 跟随系统偏好
 - **国际化** — 支持英文和中文
+- **创建模式** — `awel create` 创建新项目并启动全屏 AI 对话界面，描述你的应用，智能体从零开始为你构建
 
 ## 开发
 

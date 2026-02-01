@@ -8,16 +8,24 @@ AI-powered development overlay for Next.js. Awel runs a proxy in front of your d
 
 ## Quick Start
 
-```bash
-# Skip if you're already in a Next.js app
-npx create-next-app@latest my-app && cd my-app
+### Create a new project
 
+```bash
 # Set up at least one AI provider (pick one):
 export ANTHROPIC_API_KEY="sk-ant-..."   # Anthropic API
 export OPENAI_API_KEY="sk-..."          # OpenAI
 export GOOGLE_GENERATIVE_AI_API_KEY="..." # Google AI
 # Or install the Claude CLI: https://docs.anthropic.com/en/docs/claude-code
 
+npx awel create
+```
+
+This scaffolds a new Next.js project and marks it for creation mode. Follow the instructions to `cd` into the project and run `npx awel dev`. You'll see a full-page creation UI where you describe what you want to build — the AI agent generates the entire app for you, then transitions to the normal Awel overlay.
+
+### Use with an existing project
+
+```bash
+cd my-existing-next-app
 npx awel dev
 ```
 
@@ -25,10 +33,11 @@ Awel needs at least one configured provider to function. See [Supported Models](
 
 This starts Awel on port 3001 and proxies your Next.js dev server on port 3000. Open `http://localhost:3001` to see your app with the Awel overlay.
 
-### Options
+### Commands
 
 ```
-awel dev [options]
+awel create              Create a new Next.js project with Awel
+awel dev [options]       Start the development server with Awel overlay
 
   -p, --port <port>    Target app port (default: 3000)
   -v, --verbose        Print LLM stream events to stderr
@@ -94,6 +103,7 @@ The AI agent has access to:
 - **Diff review** — review a summary of all file changes before accepting
 - **Dark mode** — follows your system preference
 - **i18n** — English and Chinese
+- **Creation mode** — `awel create` scaffolds a new project and launches a full-page AI chat where you describe your app and the agent builds it from scratch
 
 ## Development
 
