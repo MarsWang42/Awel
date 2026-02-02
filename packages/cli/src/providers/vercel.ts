@@ -3,8 +3,9 @@ import { createOpenAI } from '@ai-sdk/openai';
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { createAnthropic } from '@ai-sdk/anthropic';
 import { claudeCode } from 'ai-sdk-provider-claude-code';
-import { createQwen } from 'qwen-ai-provider';
 import { createMinimax } from 'vercel-minimax-ai-provider';
+import { createZhipu } from 'zhipu-ai-provider';
+import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import { pauseDevServer, resumeDevServer } from '../devserver.js';
 import { addToHistory, writeSSEEvent } from '../sse.js';
 import { awelTools } from '../tools/index.js';
@@ -141,7 +142,7 @@ const ASK_USER_TOOLS = new Set(['AskUser', 'AskUserQuestion']);
 const PLAN_TOOLS = new Set(['ProposePlan', 'EnterPlanMode', 'ExitPlanMode']);
 const INTERACTIVE_TOOLS = new Set([...ASK_USER_TOOLS, ...PLAN_TOOLS]);
 
-type VercelProviderType = 'claude-code' | 'anthropic' | 'openai' | 'google-ai' | 'vercel-gateway' | 'qwen' | 'minimax';
+type VercelProviderType = 'claude-code' | 'anthropic' | 'openai' | 'google-ai' | 'vercel-gateway' | 'minimax' | 'zhipu' | 'openrouter';
 
 function createModel(modelId: string, providerType: VercelProviderType, cwd?: string) {
     if (providerType === 'claude-code') {
@@ -164,14 +165,17 @@ function createModel(modelId: string, providerType: VercelProviderType, cwd?: st
     } else if (providerType === 'google-ai') {
         const google = createGoogleGenerativeAI({});
         return google(modelId);
-    } else if (providerType === 'qwen') {
-        const qwen = createQwen({});
-        // qwen-ai-provider returns LanguageModelV1; AI SDK v6 handles v1 models
-        // at runtime but the type signature expects v2/v3 — cast to satisfy tsc.
-        return qwen(modelId) as unknown as LanguageModel;
     } else if (providerType === 'minimax') {
         const minimax = createMinimax({});
         return minimax(modelId);
+    } else if (providerType === 'zhipu') {
+        const zhipu = createZhipu({});
+        return zhipu(modelId) as unknown as LanguageModel;
+    } else if (providerType === 'openrouter') {
+        const openrouter = createOpenRouter({
+            apiKey: process.env.OPENROUTER_API_KEY,
+        });
+        return openrouter.chat(modelId);
     } else {
         // vercel-gateway: pass model ID string directly to streamText
         // ai v6 routes through the gateway using AI_GATEWAY_API_KEY env var
@@ -192,8 +196,9 @@ export function createVercelProvider(modelId: string, providerType: VercelProvid
                 openai: 'OpenAI',
                 'google-ai': 'Google AI',
                 'vercel-gateway': 'Vercel AI Gateway',
-                qwen: 'Qwen',
                 minimax: 'MiniMax',
+                zhipu: 'Zhipu AI',
+                openrouter: 'OpenRouter',
             };
             const providerLabel = PROVIDER_LABELS[providerType];
             await writeSSEEvent(stream, 'status', {

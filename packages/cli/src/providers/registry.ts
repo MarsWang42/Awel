@@ -29,12 +29,19 @@ const MODEL_CATALOG: ModelDefinition[] = [
     { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro', provider: 'google-ai' },
     { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash', provider: 'google-ai' },
 
-    // Qwen models (qwen-ai-provider — uses DASHSCOPE_API_KEY)
-    { id: 'qwen-max', label: 'Qwen Max', provider: 'qwen' },
-    { id: 'qwen-plus-latest', label: 'Qwen Plus', provider: 'qwen' },
-
     // MiniMax models (vercel-minimax-ai-provider — uses MINIMAX_API_KEY)
     { id: 'MiniMax-M2', label: 'MiniMax M2', provider: 'minimax' },
+
+    // Zhipu AI models (zhipu-ai-provider — uses ZHIPU_API_KEY)
+    { id: 'glm-4-plus', label: 'GLM-4 Plus', provider: 'zhipu' },
+    { id: 'glm-4-flash', label: 'GLM-4 Flash', provider: 'zhipu' },
+    { id: 'glm-4-long', label: 'GLM-4 Long', provider: 'zhipu' },
+
+    // OpenRouter models (@openrouter/ai-sdk-provider — uses OPENROUTER_API_KEY)
+    { id: 'deepseek/deepseek-r1', label: 'DeepSeek R1 (OpenRouter)', provider: 'openrouter' },
+    { id: 'deepseek/deepseek-chat', label: 'DeepSeek Chat (OpenRouter)', provider: 'openrouter' },
+    { id: 'meta-llama/llama-4-maverick', label: 'Llama 4 Maverick (OpenRouter)', provider: 'openrouter' },
+    { id: 'mistralai/mistral-large-latest', label: 'Mistral Large (OpenRouter)', provider: 'openrouter' },
 
     // Vercel AI Gateway — Claude models via gateway (Claude Max / API key)
     { id: 'anthropic/claude-sonnet-4-5', label: 'Sonnet 4.5 (Gateway)', provider: 'vercel-gateway' },
@@ -49,8 +56,9 @@ export const PROVIDER_ENV_KEYS: Record<string, string> = {
     openai: 'OPENAI_API_KEY',
     'google-ai': 'GOOGLE_GENERATIVE_AI_API_KEY',
     'vercel-gateway': 'AI_GATEWAY_API_KEY',
-    qwen: 'DASHSCOPE_API_KEY',
     minimax: 'MINIMAX_API_KEY',
+    zhipu: 'ZHIPU_API_KEY',
+    openrouter: 'OPENROUTER_API_KEY',
 };
 
 /**
@@ -77,8 +85,9 @@ export const PROVIDER_LABELS: Record<string, string> = {
     openai: 'OpenAI',
     'google-ai': 'Google AI',
     'vercel-gateway': 'Vercel AI Gateway',
-    qwen: 'Qwen',
     minimax: 'MiniMax',
+    zhipu: 'Zhipu AI',
+    openrouter: 'OpenRouter',
 };
 
 export interface ProviderAvailability {
@@ -139,8 +148,9 @@ export function resolveProvider(modelId: string): { provider: StreamProvider; mo
         case 'openai':
         case 'google-ai':
         case 'vercel-gateway':
-        case 'qwen':
         case 'minimax':
+        case 'zhipu':
+        case 'openrouter':
             provider = createVercelProvider(modelId, model.provider);
             break;
         default:

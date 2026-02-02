@@ -5,7 +5,7 @@ import { ChevronsUpDown, ChevronDown, Lock, X, Copy, Check } from 'lucide-react'
 interface ModelDefinition {
     id: string
     label: string
-    provider: 'claude-code' | 'anthropic' | 'openai' | 'google-ai' | 'vercel-gateway' | 'qwen' | 'minimax'
+    provider: 'claude-code' | 'anthropic' | 'openai' | 'google-ai' | 'vercel-gateway' | 'minimax' | 'zhipu' | 'openrouter'
     available: boolean
     unavailableReason?: string
 }
@@ -22,8 +22,9 @@ const PROVIDER_COLORS: Record<string, string> = {
     openai: 'text-green-600 dark:text-green-400',
     'google-ai': 'text-blue-600 dark:text-blue-400',
     'vercel-gateway': 'text-purple-600 dark:text-purple-400',
-    qwen: 'text-cyan-600 dark:text-cyan-400',
     minimax: 'text-pink-600 dark:text-pink-400',
+    zhipu: 'text-cyan-600 dark:text-cyan-400',
+    openrouter: 'text-teal-600 dark:text-teal-400',
 }
 
 const PROVIDER_LABELS: Record<string, string> = {
@@ -32,8 +33,9 @@ const PROVIDER_LABELS: Record<string, string> = {
     openai: 'OpenAI',
     'google-ai': 'Google AI',
     'vercel-gateway': 'Vercel AI Gateway',
-    qwen: 'Qwen',
     minimax: 'MiniMax',
+    zhipu: 'Zhipu AI',
+    openrouter: 'OpenRouter',
 }
 
 const PROVIDER_ENV_KEYS: Record<string, string> = {
@@ -41,8 +43,9 @@ const PROVIDER_ENV_KEYS: Record<string, string> = {
     openai: 'OPENAI_API_KEY',
     'google-ai': 'GOOGLE_GENERATIVE_AI_API_KEY',
     'vercel-gateway': 'AI_GATEWAY_API_KEY',
-    qwen: 'DASHSCOPE_API_KEY',
     minimax: 'MINIMAX_API_KEY',
+    zhipu: 'ZHIPU_API_KEY',
+    openrouter: 'OPENROUTER_API_KEY',
 }
 
 // ─── Instant Tooltip ─────────────────────────────────────────

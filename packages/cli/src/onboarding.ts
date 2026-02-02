@@ -16,8 +16,9 @@ async function promptProviderSetup(): Promise<void> {
             { value: 'openai', label: 'OpenAI', hint: 'OPENAI_API_KEY' },
             { value: 'google-ai', label: 'Google AI', hint: 'GOOGLE_GENERATIVE_AI_API_KEY' },
             { value: 'vercel-gateway', label: 'Vercel AI Gateway', hint: 'AI_GATEWAY_API_KEY' },
-            { value: 'qwen', label: 'Qwen', hint: 'DASHSCOPE_API_KEY' },
             { value: 'minimax', label: 'MiniMax', hint: 'MINIMAX_API_KEY' },
+            { value: 'zhipu', label: 'Zhipu AI', hint: 'ZHIPU_API_KEY' },
+            { value: 'openrouter', label: 'OpenRouter', hint: 'OPENROUTER_API_KEY' },
         ],
     });
 

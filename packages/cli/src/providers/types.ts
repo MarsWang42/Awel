@@ -23,5 +23,5 @@ export interface StreamProvider {
 export interface ModelDefinition {
     id: string;
     label: string;
-    provider: 'claude-code' | 'anthropic' | 'openai' | 'google-ai' | 'vercel-gateway' | 'qwen' | 'minimax';
+    provider: 'claude-code' | 'anthropic' | 'openai' | 'google-ai' | 'vercel-gateway' | 'minimax' | 'zhipu' | 'openrouter';
 }
