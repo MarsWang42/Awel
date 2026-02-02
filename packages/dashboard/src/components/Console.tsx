@@ -22,12 +22,13 @@ function InstantTooltip({ text, children }: { text: string; children: React.Reac
 
 interface ConsoleProps {
     selectedModel: string
+    selectedModelProvider: string
     onHasMessagesChange?: (hasMessages: boolean) => void
     onStreamingChange?: (isStreaming: boolean) => void
     onReviewDiffs?: (diffs: import('./DiffModal').FileDiff[]) => void
 }
 
-export function Console({ selectedModel, onHasMessagesChange, onStreamingChange, onReviewDiffs }: ConsoleProps) {
+export function Console({ selectedModel, selectedModelProvider, onHasMessagesChange, onStreamingChange, onReviewDiffs }: ConsoleProps) {
     const { t } = useTranslation()
     const {
         messages,
@@ -48,7 +49,7 @@ export function Console({ selectedModel, onHasMessagesChange, onStreamingChange,
         imageAttachments,
         setImageAttachments,
         removeImageAttachment,
-    } = useConsole(selectedModel, onReviewDiffs)
+    } = useConsole(selectedModel, selectedModelProvider, onReviewDiffs)
 
     const fileInputRef = useRef<HTMLInputElement>(null)
     const editableRef = useRef<HTMLDivElement>(null)

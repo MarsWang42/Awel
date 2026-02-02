@@ -16,13 +16,15 @@ const SUGGESTION_CHIPS = [
 
 interface CreationViewProps {
     initialModel: string
-    onModelChange: (modelId: string) => void
+    initialModelProvider: string
+    onModelChange: (modelId: string, modelProvider: string) => void
 }
 
-export function CreationView({ initialModel, onModelChange }: CreationViewProps) {
+export function CreationView({ initialModel, initialModelProvider, onModelChange }: CreationViewProps) {
     const { t } = useTranslation()
     const { resolvedTheme, setTheme } = useTheme()
     const [selectedModel, setSelectedModel] = useState(initialModel)
+    const [selectedModelProvider, setSelectedModelProvider] = useState(initialModelProvider)
     const [input, setInput] = useState('')
     const [phase, setPhase] = useState<'initial' | 'building' | 'success'>('initial')
     const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -35,7 +37,7 @@ export function CreationView({ initialModel, onModelChange }: CreationViewProps)
         submitMessage,
         stopStream,
         waitingForInput,
-    } = useConsole(selectedModel)
+    } = useConsole(selectedModel, selectedModelProvider)
 
     // Auto-focus the input on mount
     useEffect(() => {
@@ -67,10 +69,12 @@ export function CreationView({ initialModel, onModelChange }: CreationViewProps)
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
     }, [messages])
 
-    const handleModelChange = useCallback((modelId: string) => {
+    const handleModelChange = useCallback((modelId: string, modelProvider: string) => {
         setSelectedModel(modelId)
-        onModelChange(modelId)
+        setSelectedModelProvider(modelProvider)
+        onModelChange(modelId, modelProvider)
         localStorage.setItem('awel-model', modelId)
+        localStorage.setItem('awel-model-provider', modelProvider)
     }, [onModelChange])
 
     const handleSubmit = useCallback((text?: string) => {
@@ -132,6 +136,7 @@ export function CreationView({ initialModel, onModelChange }: CreationViewProps)
                 <div className="flex items-center gap-2">
                     <ModelSelector
                         selectedModel={selectedModel}
+                        selectedModelProvider={selectedModelProvider}
                         onModelChange={handleModelChange}
                         chatHasMessages={messages.length > 0}
                     />

@@ -15,7 +15,10 @@ function App() {
     const { t } = useTranslation()
     const { resolvedTheme, setTheme } = useTheme()
     const [selectedModel, setSelectedModel] = useState(
-        () => localStorage.getItem('awel-model') || 'sonnet'
+        () => localStorage.getItem('awel-model') || ''
+    )
+    const [selectedModelProvider, setSelectedModelProvider] = useState(
+        () => localStorage.getItem('awel-model-provider') || ''
     )
     const [expanded, setExpanded] = useState(false)
     const [chatKey, setChatKey] = useState(0)
@@ -40,9 +43,11 @@ function App() {
         setChatKey(k => k + 1)
     }
 
-    const handleModelChange = (modelId: string) => {
+    const handleModelChange = (modelId: string, modelProvider: string) => {
         setSelectedModel(modelId)
+        setSelectedModelProvider(modelProvider)
         localStorage.setItem('awel-model', modelId)
+        localStorage.setItem('awel-model-provider', modelProvider)
     }
 
     const handleHasMessagesChange = useCallback((hasMessages: boolean) => {
@@ -69,6 +74,7 @@ function App() {
         return (
             <CreationView
                 initialModel={selectedModel}
+                initialModelProvider={selectedModelProvider}
                 onModelChange={handleModelChange}
             />
         )
@@ -95,6 +101,7 @@ function App() {
                     <div className="flex items-center gap-2">
                         <ModelSelector
                             selectedModel={selectedModel}
+                            selectedModelProvider={selectedModelProvider}
                             onModelChange={handleModelChange}
                             chatHasMessages={chatHasMessages}
                         />
@@ -142,6 +149,7 @@ function App() {
                 <Console
                     key={chatKey}
                     selectedModel={selectedModel}
+                    selectedModelProvider={selectedModelProvider}
                     onHasMessagesChange={handleHasMessagesChange}
                     onStreamingChange={setIsStreaming}
                     onReviewDiffs={handleReviewOpen}

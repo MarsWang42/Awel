@@ -1,5 +1,6 @@
 import { execSync } from 'node:child_process';
 import { createVercelProvider } from './vercel.js';
+import type { VercelProviderType } from './vercel.js';
 import type { StreamProvider, ModelDefinition } from './types.js';
 
 // ─── Model Catalog ───────────────────────────────────────────
@@ -36,12 +37,6 @@ const MODEL_CATALOG: ModelDefinition[] = [
     { id: 'glm-4-plus', label: 'GLM-4 Plus', provider: 'zhipu' },
     { id: 'glm-4-flash', label: 'GLM-4 Flash', provider: 'zhipu' },
     { id: 'glm-4-long', label: 'GLM-4 Long', provider: 'zhipu' },
-
-    // OpenRouter models (@openrouter/ai-sdk-provider — uses OPENROUTER_API_KEY)
-    { id: 'deepseek/deepseek-r1', label: 'DeepSeek R1 (OpenRouter)', provider: 'openrouter' },
-    { id: 'deepseek/deepseek-chat', label: 'DeepSeek Chat (OpenRouter)', provider: 'openrouter' },
-    { id: 'meta-llama/llama-4-maverick', label: 'Llama 4 Maverick (OpenRouter)', provider: 'openrouter' },
-    { id: 'mistralai/mistral-large-latest', label: 'Mistral Large (OpenRouter)', provider: 'openrouter' },
 
     // Vercel AI Gateway — Claude models via gateway (Claude Max / API key)
     { id: 'anthropic/claude-sonnet-4-5', label: 'Sonnet 4.5 (Gateway)', provider: 'vercel-gateway' },
@@ -102,6 +97,7 @@ export interface ProviderAvailability {
  * Checks each provider once (claude-code via binary check, others via env var).
  */
 export function getAvailableProviders(): ProviderAvailability[] {
+    // Collect providers referenced by catalog entries
     const seen = new Set<string>();
     const result: ProviderAvailability[] = [];
 
@@ -130,34 +126,26 @@ export function getAvailableProviders(): ProviderAvailability[] {
         });
     }
 
+    // Ensure providers with env keys but no catalog entries are still listed (e.g. OpenRouter)
+    for (const [provider, envKey] of Object.entries(PROVIDER_ENV_KEYS)) {
+        if (seen.has(provider)) continue;
+        seen.add(provider);
+        const label = PROVIDER_LABELS[provider] ?? provider;
+        result.push({
+            provider,
+            label,
+            available: !!process.env[envKey],
+            envVar: envKey,
+        });
+    }
+
     return result;
 }
 
 // ─── Provider Resolution ─────────────────────────────────────
 
-export function resolveProvider(modelId: string): { provider: StreamProvider; modelProvider: string } {
-    const model = MODEL_CATALOG.find(m => m.id === modelId);
-    if (!model) {
-        throw new Error(`Unknown model: ${modelId}. Use GET /api/models for available models.`);
-    }
-
-    let provider: StreamProvider;
-    switch (model.provider) {
-        case 'claude-code':
-        case 'anthropic':
-        case 'openai':
-        case 'google-ai':
-        case 'vercel-gateway':
-        case 'minimax':
-        case 'zhipu':
-        case 'openrouter':
-            provider = createVercelProvider(modelId, model.provider);
-            break;
-        default:
-            throw new Error(`No provider implementation for: ${model.provider}`);
-    }
-
-    return { provider, modelProvider: model.provider };
+export function resolveProvider(modelId: string, modelProvider: string): { provider: StreamProvider; modelProvider: string } {
+    return { provider: createVercelProvider(modelId, modelProvider as VercelProviderType), modelProvider };
 }
 
 // ─── Model Catalog API ───────────────────────────────────────

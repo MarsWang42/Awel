@@ -103,7 +103,7 @@ export interface ElementAttachEvent {
     clearExisting?: boolean
 }
 
-export function useConsole(selectedModel: string, onReviewDiffs?: (diffs: import('../components/DiffModal').FileDiff[]) => void) {
+export function useConsole(selectedModel: string, selectedModelProvider: string, onReviewDiffs?: (diffs: import('../components/DiffModal').FileDiff[]) => void) {
     const [messages, setMessages] = useState<ParsedMessage[]>([])
     const [isLoading, setIsLoading] = useState(false)
     const [waitingForInput, setWaitingForInput] = useState(false)
@@ -394,7 +394,7 @@ export function useConsole(selectedModel: string, onReviewDiffs?: (diffs: import
 
         es.onopen = () => {
             // Connection established — now send the prompt
-            const body: Record<string, unknown> = { prompt, model: selectedModel }
+            const body: Record<string, unknown> = { prompt, model: selectedModel, modelProvider: selectedModelProvider }
             if (consoleEntries && consoleEntries.length > 0) {
                 body.consoleEntries = consoleEntries
             }
@@ -415,7 +415,7 @@ export function useConsole(selectedModel: string, onReviewDiffs?: (diffs: import
                 handleErrorEvent(new Event('error'))
             })
         }
-    }, [selectedModel, handleSSEEvent, handleErrorEvent])
+    }, [selectedModel, selectedModelProvider, handleSSEEvent, handleErrorEvent])
 
     // Listen for element selections from the host inspector via SSE
     useEffect(() => {

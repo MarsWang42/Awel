@@ -23,12 +23,15 @@ let session: ChatSession | null = null;
  * switching to or from the claude-code provider, whose self-contained tool
  * set is incompatible with messages produced by other providers.
  */
-export function getOrCreateSession(modelId: string): { provider: StreamProvider } {
-    if (session && session.modelId === modelId) {
+export function getOrCreateSession(modelId: string, modelProvider: string): { provider: StreamProvider } {
+    const cacheKey = `${modelId}:${modelProvider}`;
+    const currentKey = session ? `${session.modelId}:${session.modelProvider}` : null;
+
+    if (session && currentKey === cacheKey) {
         return { provider: session.provider };
     }
 
-    const { provider, modelProvider } = resolveProvider(modelId);
+    const { provider } = resolveProvider(modelId, modelProvider);
 
     const canPreserveMessages =
         session !== null &&

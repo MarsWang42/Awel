@@ -5,14 +5,22 @@ import { ChevronsUpDown, ChevronDown, Lock, X, Copy, Check } from 'lucide-react'
 interface ModelDefinition {
     id: string
     label: string
-    provider: 'claude-code' | 'anthropic' | 'openai' | 'google-ai' | 'vercel-gateway' | 'minimax' | 'zhipu' | 'openrouter'
+    provider: string
     available: boolean
     unavailableReason?: string
 }
 
+interface ProviderAvailability {
+    provider: string
+    label: string
+    available: boolean
+    envVar: string | null
+}
+
 interface ModelSelectorProps {
     selectedModel: string
-    onModelChange: (modelId: string) => void
+    selectedModelProvider: string
+    onModelChange: (modelId: string, modelProvider: string) => void
     chatHasMessages?: boolean
 }
 
@@ -46,6 +54,27 @@ const PROVIDER_ENV_KEYS: Record<string, string> = {
     minimax: 'MINIMAX_API_KEY',
     zhipu: 'ZHIPU_API_KEY',
     openrouter: 'OPENROUTER_API_KEY',
+}
+
+const RECENT_CUSTOM_MODELS_KEY = 'awel-custom-models'
+const MAX_RECENT_CUSTOM_MODELS = 10
+
+function loadRecentCustomModels(): string[] {
+    try {
+        const raw = localStorage.getItem(RECENT_CUSTOM_MODELS_KEY)
+        if (!raw) return []
+        const parsed = JSON.parse(raw)
+        return Array.isArray(parsed) ? parsed : []
+    } catch {
+        return []
+    }
+}
+
+function saveRecentCustomModel(modelId: string): string[] {
+    const existing = loadRecentCustomModels()
+    const deduped = [modelId, ...existing.filter(m => m !== modelId)].slice(0, MAX_RECENT_CUSTOM_MODELS)
+    localStorage.setItem(RECENT_CUSTOM_MODELS_KEY, JSON.stringify(deduped))
+    return deduped
 }
 
 // ─── Instant Tooltip ─────────────────────────────────────────
@@ -103,32 +132,43 @@ function EnvKeyRow({ provider }: { provider: string }) {
 
 // ─── Model Selector ──────────────────────────────────────────
 
-export function ModelSelector({ selectedModel, onModelChange, chatHasMessages }: ModelSelectorProps) {
+export function ModelSelector({ selectedModel, selectedModelProvider, onModelChange, chatHasMessages }: ModelSelectorProps) {
     const { t } = useTranslation()
     const [models, setModels] = useState<ModelDefinition[]>([])
+    const [providers, setProviders] = useState<ProviderAvailability[]>([])
     const [isModalOpen, setIsModalOpen] = useState(false)
     const [providerFilter, setProviderFilter] = useState<string>('all')
+    const [customModelInput, setCustomModelInput] = useState('')
+    const [recentCustomModels, setRecentCustomModels] = useState<string[]>(loadRecentCustomModels)
 
     // Determine if the current model uses the self-contained claude-code provider.
     // Switching to/from claude-code mid-chat is not supported because its tool set
     // is incompatible with messages produced by other providers.
     const selectedDef = models.find(m => m.id === selectedModel)
-    const isClaudeCode = selectedDef?.provider === 'claude-code'
+    const isClaudeCode = selectedDef?.provider === 'claude-code' || selectedModelProvider === 'claude-code'
     const disabled = chatHasMessages && isClaudeCode
+
+    const openRouterAvailable = providers.some(p => p.provider === 'openrouter' && p.available)
 
     useEffect(() => {
         async function fetchModels() {
             try {
                 const res = await fetch('/api/models')
                 const data = await res.json()
+                if (data.providers && Array.isArray(data.providers)) {
+                    setProviders(data.providers)
+                }
                 if (data.models && Array.isArray(data.models)) {
                     setModels(data.models)
+                    // If current selection is a custom OpenRouter model, don't override it
+                    const isCustomModel = selectedModelProvider === 'openrouter' && !data.models.find((m: ModelDefinition) => m.id === selectedModel)
+                    if (isCustomModel) return
                     // If current selection isn't in the list or is unavailable, select first available
                     const current = data.models.find((m: ModelDefinition) => m.id === selectedModel)
                     if (data.models.length > 0 && (!current || !current.available)) {
                         const firstAvailable = data.models.find((m: ModelDefinition) => m.available)
                         if (firstAvailable) {
-                            onModelChange(firstAvailable.id)
+                            onModelChange(firstAvailable.id, firstAvailable.provider)
                         }
                     }
                 }
@@ -150,6 +190,16 @@ export function ModelSelector({ selectedModel, onModelChange, chatHasMessages }:
         }
     }, [isModalOpen, handleKeyDown])
 
+    const handleUseCustomModel = useCallback(() => {
+        const trimmed = customModelInput.trim()
+        if (!trimmed) return
+        const updated = saveRecentCustomModel(trimmed)
+        setRecentCustomModels(updated)
+        onModelChange(trimmed, 'openrouter')
+        setCustomModelInput('')
+        setIsModalOpen(false)
+    }, [customModelInput, onModelChange])
+
     // Split models into available and unavailable
     const availableModels = models.filter(m => m.available)
     const unavailableModels = models.filter(m => !m.available)
@@ -161,18 +211,34 @@ export function ModelSelector({ selectedModel, onModelChange, chatHasMessages }:
         return acc
     }, {})
 
-    // Get unique unavailable providers (one row per provider)
-    const unavailableProviders = [...new Set(unavailableModels.map(m => m.provider))]
+    // Get unique unavailable providers from both models and providers list
+    const unavailableProviderKeys = new Set(unavailableModels.map(m => m.provider))
+    // Also add providers that are unavailable and not represented in availableGrouped
+    for (const p of providers) {
+        if (!p.available && !availableGrouped[p.provider]) {
+            unavailableProviderKeys.add(p.provider)
+        }
+    }
+    const unavailableProviders = [...unavailableProviderKeys]
 
     // Available provider keys for the filter dropdown
-    const availableProviderKeys = Object.keys(availableGrouped)
+    const availableProviderKeys = [...Object.keys(availableGrouped)]
+    if (openRouterAvailable) {
+        availableProviderKeys.push('openrouter')
+    }
 
     // Filtered groups based on provider filter
     const filteredGroups = providerFilter === 'all'
         ? availableGrouped
         : { [providerFilter]: availableGrouped[providerFilter] || [] }
 
-    if (models.length === 0) return null
+    // Show custom model section when openrouter is available and filter allows it
+    const showCustomModelSection = openRouterAvailable && (providerFilter === 'all' || providerFilter === 'openrouter')
+
+    if (models.length === 0 && providers.length === 0) return null
+
+    // Display for the trigger button
+    const isCustomOpenRouterModel = !selectedDef && selectedModelProvider === 'openrouter'
 
     const selectorButton = (
         <button
@@ -194,7 +260,12 @@ export function ModelSelector({ selectedModel, onModelChange, chatHasMessages }:
                     {selectedDef.label}
                 </span>
             )}
-            {!selectedDef && <span>{t('selectModel')}</span>}
+            {isCustomOpenRouterModel && (
+                <span className={`truncate ${PROVIDER_COLORS['openrouter']}`}>
+                    {selectedModel}
+                </span>
+            )}
+            {!selectedDef && !isCustomOpenRouterModel && <span>{t('selectModel')}</span>}
             {!disabled && <ChevronsUpDown className="w-3 h-3 text-muted-foreground flex-shrink-0" />}
         </button>
     )
@@ -259,7 +330,7 @@ export function ModelSelector({ selectedModel, onModelChange, chatHasMessages }:
                                                 disabled={isLocked}
                                                 onClick={() => {
                                                     if (isLocked) return
-                                                    onModelChange(m.id)
+                                                    onModelChange(m.id, m.provider)
                                                     setIsModalOpen(false)
                                                 }}
                                                 className={`w-full text-left px-4 py-2 text-xs transition-colors ${
@@ -286,6 +357,60 @@ export function ModelSelector({ selectedModel, onModelChange, chatHasMessages }:
                                     })}
                                 </div>
                             ))}
+
+                            {/* Custom OpenRouter model input */}
+                            {showCustomModelSection && (
+                                <div>
+                                    <div className={`px-4 py-1.5 text-[10px] font-medium uppercase tracking-wider bg-card/50 sticky top-0 ${PROVIDER_COLORS['openrouter']}`}>
+                                        {PROVIDER_LABELS['openrouter']}
+                                    </div>
+                                    <div className="px-4 py-2.5 space-y-2">
+                                        <div className="flex gap-2">
+                                            <input
+                                                type="text"
+                                                value={customModelInput}
+                                                onChange={(e) => setCustomModelInput(e.target.value)}
+                                                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleUseCustomModel() } }}
+                                                placeholder={t('customModelPlaceholder', 'e.g. deepseek/deepseek-r1')}
+                                                className="flex-1 text-xs bg-muted border border-border rounded-md px-2.5 py-1.5 text-foreground placeholder:text-muted-foreground outline-none focus:border-ring transition-colors"
+                                            />
+                                            <button
+                                                onClick={handleUseCustomModel}
+                                                disabled={!customModelInput.trim()}
+                                                className={`text-xs px-3 py-1.5 rounded-md transition-colors font-medium ${
+                                                    customModelInput.trim()
+                                                        ? 'bg-teal-600 hover:bg-teal-700 text-white'
+                                                        : 'bg-muted text-muted-foreground cursor-not-allowed'
+                                                }`}
+                                            >
+                                                {t('useModel', 'Use')}
+                                            </button>
+                                        </div>
+                                        {recentCustomModels.length > 0 && (
+                                            <div className="flex flex-wrap gap-1.5">
+                                                {recentCustomModels.map(modelId => (
+                                                    <button
+                                                        key={modelId}
+                                                        onClick={() => {
+                                                            const updated = saveRecentCustomModel(modelId)
+                                                            setRecentCustomModels(updated)
+                                                            onModelChange(modelId, 'openrouter')
+                                                            setIsModalOpen(false)
+                                                        }}
+                                                        className={`text-[10px] px-2 py-0.5 rounded-full border transition-colors ${
+                                                            modelId === selectedModel && selectedModelProvider === 'openrouter'
+                                                                ? 'border-teal-500 bg-teal-500/10 text-teal-600 dark:text-teal-400'
+                                                                : 'border-border bg-muted/50 text-muted-foreground hover:text-foreground hover:bg-muted'
+                                                        }`}
+                                                    >
+                                                        {modelId}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
 
                             {/* Unavailable providers */}
                             {providerFilter === 'all' && unavailableProviders.length > 0 && (

@@ -3,7 +3,7 @@ import { streamSSE } from 'hono/streaming';
 import { EventEmitter } from 'node:events';
 import { z } from 'zod';
 import { addToHistory, getHistory, clearHistory } from './sse.js';
-import { getModelCatalogWithAvailability } from './providers/registry.js';
+import { getModelCatalogWithAvailability, getAvailableProviders } from './providers/registry.js';
 import { getOrCreateSession, getSessionMessages, appendUserMessage, appendResponseMessages, resetSession } from './session.js';
 import { getActivePlan, approvePlan } from './plan-store.js';
 import { restartDevServer, getDevServerStatus } from './subprocess.js';
@@ -45,6 +45,7 @@ const PageContextSchema = z.object({
 const ChatRequestSchema = z.object({
     prompt: z.string().min(1),
     model: z.string().optional(),
+    modelProvider: z.string(),
     consoleEntries: z.array(ConsoleEntrySchema).optional(),
     images: z.array(z.string()).optional(),
     pageContext: PageContextSchema.optional(),
@@ -115,7 +116,7 @@ export function createAgentRoute(projectCwd: string, targetPort: number, isFresh
     // ─── Model Catalog ───────────────────────────────────────
 
     agent.get('/api/models', (c) => {
-        return c.json({ models: getModelCatalogWithAvailability() });
+        return c.json({ models: getModelCatalogWithAvailability(), providers: getAvailableProviders() });
     });
 
     // ─── Chat (trigger LLM) ─────────────────────────────────
@@ -134,7 +135,7 @@ export function createAgentRoute(projectCwd: string, targetPort: number, isFresh
             return c.json({ success: false, error: message }, 400);
         }
 
-        const { prompt, model, consoleEntries, images, pageContext } = parsed.data;
+        const { prompt, model, modelProvider, consoleEntries, images, pageContext } = parsed.data;
         const modelId = model ?? DEFAULT_MODEL;
 
         // Prepend context blocks to the prompt
@@ -174,7 +175,7 @@ export function createAgentRoute(projectCwd: string, targetPort: number, isFresh
         } as unknown as SSEStreamingApi;
 
         try {
-            const { provider } = getOrCreateSession(modelId);
+            const { provider } = getOrCreateSession(modelId, modelProvider);
             const messages = getSessionMessages(userContent);
 
             // Fire and forget — events flow through the bus to connected SSE clients.

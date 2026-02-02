@@ -142,7 +142,7 @@ const ASK_USER_TOOLS = new Set(['AskUser', 'AskUserQuestion']);
 const PLAN_TOOLS = new Set(['ProposePlan', 'EnterPlanMode', 'ExitPlanMode']);
 const INTERACTIVE_TOOLS = new Set([...ASK_USER_TOOLS, ...PLAN_TOOLS]);
 
-type VercelProviderType = 'claude-code' | 'anthropic' | 'openai' | 'google-ai' | 'vercel-gateway' | 'minimax' | 'zhipu' | 'openrouter';
+export type VercelProviderType = 'claude-code' | 'anthropic' | 'openai' | 'google-ai' | 'vercel-gateway' | 'minimax' | 'zhipu' | 'openrouter';
 
 function createModel(modelId: string, providerType: VercelProviderType, cwd?: string) {
     if (providerType === 'claude-code') {

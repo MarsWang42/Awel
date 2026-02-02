@@ -71,5 +71,8 @@
     "creationChipEcommerce": "E-commerce store",
     "creationChipBlog": "Blog platform",
     "creationChipDashboard": "Admin dashboard",
-    "creationChipPortfolio": "Portfolio site"
+    "creationChipPortfolio": "Portfolio site",
+    "useModel": "Use",
+    "customModelPlaceholder": "e.g. deepseek/deepseek-r1",
+    "allProviders": "All Providers"
 }

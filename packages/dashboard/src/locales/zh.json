@@ -71,5 +71,8 @@
     "creationChipEcommerce": "电商平台",
     "creationChipBlog": "博客平台",
     "creationChipDashboard": "管理后台",
-    "creationChipPortfolio": "个人作品集"
+    "creationChipPortfolio": "个人作品集",
+    "useModel": "使用",
+    "customModelPlaceholder": "例如 deepseek/deepseek-r1",
+    "allProviders": "所有提供商"
 }
