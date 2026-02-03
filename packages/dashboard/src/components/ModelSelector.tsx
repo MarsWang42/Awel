@@ -216,7 +216,7 @@ export const ModelSelector = forwardRef<ModelSelectorHandle, ModelSelectorProps>
             }`}
         >
             {selectedDef && (
-                <span className={`truncate ${disabled ? 'text-muted-foreground' : selectedDef.color}`}>
+                <span className={`truncate ${selectedDef.color}`}>
                     {selectedDef.label}
                 </span>
             )}

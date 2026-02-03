@@ -170,7 +170,7 @@ function createModel(modelId: string, providerType: ProviderType, cwd?: string) 
             permissionMode: 'acceptEdits',
             streamingInput: 'always',
             maxTurns: 25,
-            appendSystemPrompt: appendPrompt,
+            systemPrompt: { type: 'preset', preset: 'claude_code', append: appendPrompt },
         });
     } else if (providerType === 'anthropic') {
         const anthropic = createAnthropic({});

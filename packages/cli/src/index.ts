@@ -6,7 +6,7 @@ import { AWEL_PORT, USER_APP_PORT } from './config.js';
 import { setVerbose } from './verbose.js';
 import { ensureBabelPlugin } from './babel-setup.js';
 import { ensureProvider } from './onboarding.js';
-import { ensureMemorySkill } from './skills.js';
+import { ensureSkills } from './skills.js';
 import { awel } from './logger.js';
 import { spawnDevServer } from './subprocess.js';
 import { writeAwelConfig, isProjectFresh } from './awel-config.js';
@@ -67,7 +67,7 @@ program
 
         await ensureProvider(cwd);
         if (!fresh && framework === 'nextjs') await ensureBabelPlugin(cwd);
-        await ensureMemorySkill(cwd);
+        await ensureSkills(cwd);
 
         // Restore chat history and session from previous run
         initHistory(cwd);

@@ -59,6 +59,9 @@ export async function startServer({ awelPort, targetPort, projectCwd, fresh }: S
   });
 
   wsProxy.on('error', (err) => {
+    // EPIPE / ECONNRESET are expected when the dev server restarts during HMR
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code === 'EPIPE' || code === 'ECONNRESET' || !err.message) return;
     console.error('WebSocket proxy error:', err.message);
   });
 

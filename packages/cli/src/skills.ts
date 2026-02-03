@@ -87,30 +87,64 @@ When you retrieve contextual memories, bump their \`usageCount\` and \`lastUsedA
 - Before working on an unfamiliar part of the codebase, search memories for relevant context.
 `;
 
-const SKILL_REL_PATH = join('.claude', 'skills', 'memory', 'SKILL.md');
+const DEV_SERVER_SKILL_MD = `---
+description: Important rules for working with the dev server in Awel. You MUST follow these rules when the dev server needs restarting or when running dev commands.
+---
 
-export function isMemorySkillInstalled(projectCwd: string): boolean {
-    return existsSync(join(projectCwd, SKILL_REL_PATH));
+# Dev Server — Awel Managed Process
+
+**Awel manages the dev server process (e.g. \`npm run dev\`) automatically.** You do NOT control it directly.
+
+## Critical Rules
+
+1. **NEVER kill or restart the dev server yourself.** Do not run commands like:
+   - \`kill\`, \`pkill\`, \`killall\` targeting the dev server process
+   - \`npm run dev\`, \`npx next dev\`, or any command that starts a new dev server
+   - \`lsof -i\` + \`kill\` to free the port
+
+2. **If the dev server needs restarting** (e.g. after changing \`next.config.js\`, \`.env\`, or \`package.json\`), tell the user to restart it. Do not attempt to restart it yourself.
+
+3. **The dev server auto-restarts** when it crashes. Awel watches the process and restarts it automatically. If there is a build error, fix the code — the server will restart on its own once the file is saved.
+
+4. **HMR handles most changes.** After editing React components, pages, or styles, the browser updates automatically via Hot Module Replacement. No restart is needed.
+
+## What You CAN Do
+
+- Edit project files normally (Read, Write, Edit) — HMR will pick up changes
+- Run \`npm install\` to add dependencies (Awel will detect the restart need)
+- Run build/lint/test commands like \`npm run build\`, \`npx tsc --noEmit\`, \`npx eslint\`
+`;
+
+const MEMORY_SKILL_REL_PATH = join('.claude', 'skills', 'memory', 'SKILL.md');
+const DEV_SERVER_SKILL_REL_PATH = join('.claude', 'skills', 'dev-server', 'SKILL.md');
+
+export function isSkillsInstalled(projectCwd: string): boolean {
+    return existsSync(join(projectCwd, MEMORY_SKILL_REL_PATH))
+        && existsSync(join(projectCwd, DEV_SERVER_SKILL_REL_PATH));
 }
 
-export function installMemorySkill(projectCwd: string): void {
-    const dir = join(projectCwd, '.claude', 'skills', 'memory');
-    mkdirSync(dir, { recursive: true });
-    writeFileSync(join(dir, 'SKILL.md'), MEMORY_SKILL_MD, 'utf-8');
+export function installSkills(projectCwd: string): void {
+    const memoryDir = join(projectCwd, '.claude', 'skills', 'memory');
+    mkdirSync(memoryDir, { recursive: true });
+    writeFileSync(join(memoryDir, 'SKILL.md'), MEMORY_SKILL_MD, 'utf-8');
+
+    const devServerDir = join(projectCwd, '.claude', 'skills', 'dev-server');
+    mkdirSync(devServerDir, { recursive: true });
+    writeFileSync(join(devServerDir, 'SKILL.md'), DEV_SERVER_SKILL_MD, 'utf-8');
 }
 
 /**
- * On first run, prompts the user to install the memory skill for Claude Code.
+ * On first run, prompts the user to install Awel skills for Claude Code.
  * Persists the choice in .awel/config.json so we only ask once.
  */
-export async function ensureMemorySkill(projectCwd: string): Promise<void> {
+export async function ensureSkills(projectCwd: string): Promise<void> {
     const config = readAwelConfig(projectCwd);
 
     // Already asked — respect previous choice
     if (config.skillsInstalled !== undefined) {
-        // If they said yes before but the file is missing (e.g. git clean), reinstall silently
-        if (config.skillsInstalled && !isMemorySkillInstalled(projectCwd)) {
-            installMemorySkill(projectCwd);
+        // If they said yes before but files are missing (e.g. git clean), reinstall silently
+        if (config.skillsInstalled && !isSkillsInstalled(projectCwd)) {
+            installSkills(projectCwd);
         }
         return;
     }
@@ -118,7 +152,7 @@ export async function ensureMemorySkill(projectCwd: string): Promise<void> {
     const p = await import('@clack/prompts');
 
     const install = await p.confirm({
-        message: 'Install Awel memory skill for Claude Code? (enables persistent project memories across sessions)',
+        message: 'Install Awel skills for Claude Code? (Highly recommended — includes project memory and dev server rules)',
         initialValue: true,
     });
 
@@ -129,8 +163,8 @@ export async function ensureMemorySkill(projectCwd: string): Promise<void> {
     }
 
     if (install) {
-        installMemorySkill(projectCwd);
-        awel.log('  Installed memory skill to .claude/skills/memory/SKILL.md');
+        installSkills(projectCwd);
+        awel.log('  Installed skills to .claude/skills/');
     }
 
     writeAwelConfig(projectCwd, { ...config, skillsInstalled: install });
