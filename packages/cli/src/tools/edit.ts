@@ -2,7 +2,6 @@ import { tool } from 'ai';
 import { z } from 'zod';
 import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { resolve } from 'path';
-import { pushSnapshot } from '../undo.js';
 
 export function createEditTool(cwd: string) {
     return tool({
@@ -19,7 +18,6 @@ export function createEditTool(cwd: string) {
                 return `Error: File not found: ${fullPath}`;
             }
             try {
-                pushSnapshot(fullPath);
                 const content = readFileSync(fullPath, 'utf-8');
                 if (!content.includes(old_string)) {
                     return `Error: old_string not found in ${file_path}`;

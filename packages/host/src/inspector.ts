@@ -2,6 +2,7 @@
 
 import { AWEL_PORT, INSPECTOR_WHEEL_THRESHOLD, isAwelElement, resolvedTheme } from './state.js';
 import { isSidebarVisible } from './overlay.js';
+import { isPascalCase, parsePixelValue, getSourceLocFromAttribute, getElementLabel } from './inspectorUtils.js';
 
 // ─── State ────────────────────────────────────────────────────
 
@@ -52,19 +53,7 @@ export function setPendingInspectorPayload(payload: Record<string, unknown> | nu
 
 // ─── Source Detection (data- attributes) ──────────────────────
 
-function getSourceLocFromAttribute(element: HTMLElement): { fileName: string; line: number; column: number } | null {
-  const attr = element.getAttribute('data-source-loc');
-  if (!attr) return null;
-  const parts = attr.split(':');
-  if (parts.length < 2) return null;
-  const column = parts.length >= 3 ? parseInt(parts[parts.length - 1], 10) : 0;
-  const line = parseInt(parts[parts.length - 2], 10);
-  const fileName = parts.slice(0, parts.length - 2).join(':');
-  if (fileName && !isNaN(line)) {
-    return { fileName, line, column: isNaN(column) ? 0 : column };
-  }
-  return null;
-}
+// getSourceLocFromAttribute moved to inspectorUtils.ts
 
 function getComponentFromAttribute(element: HTMLElement): string | null {
   return element.getAttribute('data-source-component') || null;
@@ -144,9 +133,7 @@ function getSourceLocFromFiber(element: HTMLElement): { fileName: string; line: 
   return null;
 }
 
-function isPascalCase(name: string): boolean {
-  return /^[A-Z][a-zA-Z0-9]*$/.test(name);
-}
+// isPascalCase moved to inspectorUtils.ts
 
 // Only treat a component as user-defined if its _debugSource points to
 // a project file (not node_modules, not a synthetic/internal path).
@@ -203,10 +190,7 @@ function getComponentChainFromFiber(element: HTMLElement): string[] | null {
 
 // ─── Highlight & Click ────────────────────────────────────────
 
-function parsePixelValue(value: string): number {
-  const n = parseFloat(value);
-  return isNaN(n) ? 0 : n;
-}
+// parsePixelValue moved to inspectorUtils.ts
 
 function createBoxModelOverlay(id?: string): HTMLDivElement {
   // container > margin > border > padding > content
@@ -317,11 +301,7 @@ function getAncestorAtDepth(element: HTMLElement, depth: number): HTMLElement {
   return current;
 }
 
-function getElementLabel(element: HTMLElement): string {
-  const tag = `<${element.tagName.toLowerCase()}>`;
-  const component = element.getAttribute('data-source-component');
-  return component ? `${component} · ${tag}` : tag;
-}
+// getElementLabel moved to inspectorUtils.ts
 
 function updateInspectorLabel(rect: DOMRect): void {
   if (!inspectorCurrentTarget) return;

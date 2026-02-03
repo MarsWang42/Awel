@@ -1,5 +1,5 @@
 import { readAwelConfig, writeAwelConfig } from './awel-config.js';
-import { getAvailableProviders, PROVIDER_ENV_KEYS, PROVIDER_LABELS } from './providers/registry.js';
+import { getProviderCatalog, PROVIDER_ENV_KEYS, PROVIDER_LABELS } from './providers/registry.js';
 import { awel } from './logger.js';
 
 async function promptProviderSetup(): Promise<void> {
@@ -63,7 +63,7 @@ async function promptProviderSetup(): Promise<void> {
 
 export async function ensureProvider(projectCwd: string): Promise<void> {
     const config = readAwelConfig(projectCwd);
-    const providers = getAvailableProviders();
+    const providers = getProviderCatalog();
     const available = providers.filter(p => p.available);
     const isFirstRun = !config.onboarded;
 
@@ -71,7 +71,7 @@ export async function ensureProvider(projectCwd: string): Promise<void> {
         // First run with providers available — show welcome
         awel.log('');
         awel.log('Welcome to Awel!');
-        awel.log('AI-powered development overlay for Next.js');
+        awel.log('AI-powered development overlay for Next.js & React');
         awel.log('');
         awel.log(`\u2714 ${available.length} provider${available.length === 1 ? '' : 's'} available:`);
         for (const p of available) {
@@ -87,7 +87,7 @@ export async function ensureProvider(projectCwd: string): Promise<void> {
         // First run with NO providers — show welcome + interactive setup, exit
         awel.log('');
         awel.log('Welcome to Awel!');
-        awel.log('AI-powered development overlay for Next.js');
+        awel.log('AI-powered development overlay for Next.js & React');
         awel.log('');
         await promptProviderSetup();
         process.exit(1);

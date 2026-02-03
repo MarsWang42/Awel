@@ -2,33 +2,23 @@ import { ImagePlus, Send, Square, Terminal, Loader2, X, Crosshair } from 'lucide
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from './ui/button'
+import { Tooltip } from './ui/tooltip'
 import { ConsoleChips } from './ConsoleChips'
 import { ImagePreviewModal } from './ImagePreviewModal'
 import { useConsole } from '../hooks/useConsole'
 import type { ConsoleEntry, SelectedElement, ContentSegment } from '../types/messages'
 
-function InstantTooltip({ text, children }: { text: string; children: React.ReactNode }) {
-    return (
-        <div className="relative group/tip">
-            {children}
-            <div className="invisible group-hover/tip:visible opacity-0 group-hover/tip:opacity-100 transition-opacity duration-100
-                absolute z-[60] px-2 py-1 text-[10px] leading-tight text-muted-foreground bg-card border border-border rounded shadow-lg
-                whitespace-nowrap pointer-events-none bottom-full mb-1.5 right-0">
-                {text}
-            </div>
-        </div>
-    )
-}
-
 interface ConsoleProps {
     selectedModel: string
     selectedModelProvider: string
+    modelReady: boolean
+    onModelRequired: () => void
     onHasMessagesChange?: (hasMessages: boolean) => void
     onStreamingChange?: (isStreaming: boolean) => void
     onReviewDiffs?: (diffs: import('./DiffModal').FileDiff[]) => void
 }
 
-export function Console({ selectedModel, selectedModelProvider, onHasMessagesChange, onStreamingChange, onReviewDiffs }: ConsoleProps) {
+export function Console({ selectedModel, selectedModelProvider, modelReady, onModelRequired, onHasMessagesChange, onStreamingChange, onReviewDiffs }: ConsoleProps) {
     const { t } = useTranslation()
     const {
         messages,
@@ -323,6 +313,10 @@ export function Console({ selectedModel, selectedModelProvider, onHasMessagesCha
 
     const handleFormSubmit = useCallback((e?: React.FormEvent) => {
         e?.preventDefault()
+        if (!modelReady) {
+            onModelRequired()
+            return
+        }
         const text = getTextFromEditable()
         const elements = getChipsFromEditable()
         const hasImages = imageAttachments.length > 0
@@ -343,7 +337,7 @@ export function Console({ selectedModel, selectedModelProvider, onHasMessagesCha
             contentSegments,
         })
         clearEditable()
-    }, [getTextFromEditable, getChipsFromEditable, getContentSegmentsFromEditable, imageAttachments, isLoading, submitMessage, clearEditable, t])
+    }, [modelReady, onModelRequired, getTextFromEditable, getChipsFromEditable, getContentSegmentsFromEditable, imageAttachments, isLoading, submitMessage, clearEditable, t])
 
     const handleEditableKeyDown = useCallback((e: React.KeyboardEvent) => {
         if (e.key === 'Enter' && !e.shiftKey) {
@@ -431,7 +425,7 @@ export function Console({ selectedModel, selectedModelProvider, onHasMessagesCha
                     />
                 </div>
                 <div className="flex items-center gap-0.5 mr-4 mb-1.5">
-                    <InstantTooltip text={t('inspectElement')}>
+                    <Tooltip position="top-right" text={t('inspectElement')}>
                         <button
                             type="button"
                             onClick={triggerInspectForAttach}
@@ -441,8 +435,8 @@ export function Console({ selectedModel, selectedModelProvider, onHasMessagesCha
                         >
                             <Crosshair className="w-4 h-4" />
                         </button>
-                    </InstantTooltip>
-                    <InstantTooltip text={t('attachImage')}>
+                    </Tooltip>
+                    <Tooltip position="top-right" text={t('attachImage')}>
                         <button
                             type="button"
                             onClick={handleImageAttach}
@@ -452,7 +446,7 @@ export function Console({ selectedModel, selectedModelProvider, onHasMessagesCha
                         >
                             <ImagePlus className="w-4 h-4" />
                         </button>
-                    </InstantTooltip>
+                    </Tooltip>
                 </div>
             </div>
 

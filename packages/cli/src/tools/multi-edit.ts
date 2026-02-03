@@ -2,7 +2,6 @@ import { tool } from 'ai';
 import { z } from 'zod';
 import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { resolve } from 'path';
-import { pushSnapshot } from '../undo.js';
 
 export function createMultiEditTool(cwd: string) {
     return tool({
@@ -26,7 +25,6 @@ export function createMultiEditTool(cwd: string) {
             }
 
             try {
-                pushSnapshot(fullPath);
                 let content = readFileSync(fullPath, 'utf-8');
                 const results: string[] = [];
 

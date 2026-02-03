@@ -74,5 +74,8 @@
     "creationChipPortfolio": "个人作品集",
     "useModel": "使用",
     "customModelPlaceholder": "例如 deepseek/deepseek-r1",
-    "allProviders": "所有提供商"
+    "allProviders": "所有提供商",
+    "chooseModelFirst": "请先选择一个模型。",
+    "chooseModelHeading": "选择模型",
+    "noModelsAvailable": "暂无可用模型，请先配置提供商。"
 }

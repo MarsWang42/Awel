@@ -16,86 +16,7 @@ import {
 import { ToolGroup } from '../components/chat/ToolGroup'
 import type { ParsedMessage, SelectedElement, ConsoleEntry, ContentSegment, PageContext } from '../types/messages'
 import { parseSSEData } from '../services/sseParser'
-
-function buildOpeningTag(el: SelectedElement): string {
-    const attrs: string[] = []
-    if (el.attributes) {
-        for (const [name, value] of Object.entries(el.attributes)) {
-            attrs.push(value ? `${name}="${value}"` : name)
-        }
-    }
-    return attrs.length > 0 ? `<${el.tag} ${attrs.join(' ')}>` : `<${el.tag}>`
-}
-
-function buildMultiElementContext(elements: SelectedElement[]): string {
-    if (elements.length === 1) {
-        return buildInspectorContext(elements[0])
-    }
-    return elements.map((el, i) => {
-        const name = el.component || `<${el.tag}>`
-        return `[Component ${i + 1}: ${name}]\n${buildInspectorContext(el)}`
-    }).join('\n\n')
-}
-
-function buildInspectorContext(el: SelectedElement): string {
-    const lines: string[] = ['[Inspector Context]']
-
-    // ── Selected tag (the specific element the user clicked) ──
-    lines.push('')
-    lines.push('## Selected Tag')
-    lines.push(`Rendered HTML: ${buildOpeningTag(el)}`)
-    if (el.text) {
-        lines.push(`Text content: "${el.text}"`)
-    }
-    lines.push('')
-    lines.push('IMPORTANT: The user selected this specific <' + el.tag + '> tag. Any changes must target ONLY this element, not the entire parent component.')
-
-    // ── Parent component (broader context) ──
-    if (el.component) {
-        lines.push('')
-        lines.push('## Parent Component Context')
-        lines.push(`Component: ${el.component}`)
-        if (el.source) {
-            let loc = `Source: ${el.source}`
-            if (el.line) loc += `:${el.line}`
-            if (el.column) loc += `:${el.column}`
-            lines.push(loc)
-        }
-        if (el.propsTypeDefinition) {
-            lines.push('')
-            lines.push('Props type definition:')
-            lines.push('```tsx')
-            lines.push(el.propsTypeDefinition)
-            lines.push('```')
-        }
-        if (el.sourceSnippet) {
-            lines.push('')
-            lines.push(`Source code around line ${el.line} (find the <${el.tag}> within this snippet):`)
-            lines.push('```tsx')
-            lines.push(el.sourceSnippet)
-            lines.push('```')
-        }
-    } else {
-        // No parent component — still show source context if available
-        if (el.source) {
-            lines.push('')
-            lines.push('## Source Context')
-            let loc = `Source: ${el.source}`
-            if (el.line) loc += `:${el.line}`
-            if (el.column) loc += `:${el.column}`
-            lines.push(loc)
-        }
-        if (el.sourceSnippet) {
-            lines.push('')
-            lines.push(`Source code around line ${el.line}:`)
-            lines.push('```tsx')
-            lines.push(el.sourceSnippet)
-            lines.push('```')
-        }
-    }
-
-    return lines.join('\n')
-}
+import { buildInspectorContext, buildMultiElementContext } from './inspectorHelpers'
 
 export interface ElementAttachEvent {
     element: SelectedElement
@@ -188,6 +109,18 @@ export function useConsole(selectedModel: string, selectedModelProvider: string,
                     }
 
                     setMessages(parsedMessages)
+
+                    // Check if there's an active stream we should reconnect to
+                    try {
+                        const statusRes = await fetch('/api/stream/status')
+                        const statusData = await statusRes.json()
+                        if (statusData.active) {
+                            setIsLoading(true)
+                            connectEventSourceRef.current('/api/stream?reconnect=1')
+                        }
+                    } catch {
+                        // Status check failed, no reconnection
+                    }
                 }
             } catch {
                 // History not available, start fresh
@@ -359,14 +292,10 @@ export function useConsole(selectedModel: string, selectedModelProvider: string,
 
     const SSE_EVENT_TYPES = ['text', 'tool_use', 'tool_result', 'status', 'plan', 'question', 'result', 'message'] as const
 
-    const startStream = useCallback((prompt: string, consoleEntries?: ConsoleEntry[], images?: string[]) => {
-        setIsLoading(true)
-        setWaitingForInput(false)
-        setAborted(false)
+    const connectEventSource = useCallback((url: string) => {
         eventSourceRef.current?.close()
 
-        // Open SSE listener first, then trigger the LLM via POST
-        const es = new EventSource('/api/stream')
+        const es = new EventSource(url)
         eventSourceRef.current = es
 
         for (const type of SSE_EVENT_TYPES) {
@@ -392,6 +321,21 @@ export function useConsole(selectedModel: string, selectedModelProvider: string,
             }
         })
 
+        return es
+    }, [handleSSEEvent, handleErrorEvent])
+
+    // Ref so the mount effect can call the latest connectEventSource without re-running
+    const connectEventSourceRef = useRef(connectEventSource)
+    useEffect(() => { connectEventSourceRef.current = connectEventSource }, [connectEventSource])
+
+    const startStream = useCallback((prompt: string, consoleEntries?: ConsoleEntry[], images?: string[]) => {
+        setIsLoading(true)
+        setWaitingForInput(false)
+        setAborted(false)
+
+        // Open SSE listener first, then trigger the LLM via POST
+        const es = connectEventSource('/api/stream')
+
         es.onopen = () => {
             // Connection established — now send the prompt
             const body: Record<string, unknown> = { prompt, model: selectedModel, modelProvider: selectedModelProvider }
@@ -415,7 +359,7 @@ export function useConsole(selectedModel: string, selectedModelProvider: string,
                 handleErrorEvent(new Event('error'))
             })
         }
-    }, [selectedModel, selectedModelProvider, handleSSEEvent, handleErrorEvent])
+    }, [selectedModel, selectedModelProvider, connectEventSource, handleErrorEvent])
 
     // Listen for element selections from the host inspector via SSE
     useEffect(() => {
@@ -682,6 +626,10 @@ export function useConsole(selectedModel: string, selectedModelProvider: string,
                         numTurns: msg.numTurns,
                         durationMs: msg.durationMs,
                         totalCostUsd: msg.totalCostUsd,
+                        inputTokens: msg.inputTokens,
+                        outputTokens: msg.outputTokens,
+                        cacheReadTokens: msg.cacheReadTokens,
+                        cacheWriteTokens: msg.cacheWriteTokens,
                         fileStats: msg.fileStats,
                         undone: msg.undone,
                         isLatest: i === lastResultIndex,

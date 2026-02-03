@@ -14,6 +14,7 @@ import { createCodeSearchTool } from './code-search.js';
 import { createMultiEditTool } from './multi-edit.js';
 import { createTodoReadTool, createTodoWriteTool } from './todo.js';
 import { createRestartDevServerTool } from './restart-dev-server.js';
+import { createMemoryTool } from './memory.js';
 
 /**
  * Returns all agentic tools configured for the given project directory.
@@ -38,5 +39,6 @@ export function awelTools(cwd: string) {
         TodoRead: createTodoReadTool(),
         TodoWrite: createTodoWriteTool(),
         RestartDevServer: createRestartDevServerTool(),
+        Memory: createMemoryTool(cwd),
     };
 }

@@ -22,6 +22,10 @@ export interface ParsedMessage {
     numTurns?: number
     durationMs?: number
     totalCostUsd?: number
+    inputTokens?: number
+    outputTokens?: number
+    cacheReadTokens?: number
+    cacheWriteTokens?: number
     fileStats?: Array<{ relativePath: string; additions: number; deletions: number; isNew: boolean }>
     undone?: boolean
     // Compact boundary fields

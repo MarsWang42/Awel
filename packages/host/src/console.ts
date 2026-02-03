@@ -8,6 +8,7 @@ import {
   type SourceFrame,
   type RawFrame,
 } from './state.js';
+import { consoleDedupeKey, formatConsoleArgs } from './consoleUtils.js';
 
 // ─── State ────────────────────────────────────────────────────
 
@@ -29,9 +30,7 @@ export function setConsoleHasUnviewed(value: boolean): void {
 
 // ─── Functions ────────────────────────────────────────────────
 
-function consoleDedupeKey(level: string, message: string): string {
-  return level + ':' + message.trim().slice(0, 200);
-}
+// consoleDedupeKey moved to consoleUtils.ts
 
 export function broadcastConsoleEntries(): void {
   const sidebar = document.getElementById('awel-sidebar');
@@ -185,13 +184,7 @@ async function resolveOriginalSource(rawFrames: RawFrame[]): Promise<SourceFrame
 
 // ─── Console Interception Setup ───────────────────────────────
 
-function formatConsoleArgs(args: unknown[]): string {
-  return args.map(arg => {
-    if (arg instanceof Error) return arg.stack || arg.message;
-    if (typeof arg === 'string') return arg;
-    try { return JSON.stringify(arg, null, 2); } catch { return String(arg); }
-  }).join(' ');
-}
+// formatConsoleArgs moved to consoleUtils.ts
 
 export function setupConsoleInterception(): void {
   const originalError = console.error;

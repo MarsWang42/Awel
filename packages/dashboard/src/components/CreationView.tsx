@@ -2,10 +2,18 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Send, Loader2, Square, Sparkles } from 'lucide-react'
 import { Button } from './ui/button'
-import { ModelSelector } from './ModelSelector'
+import { ModelSelector, type ModelSelectorHandle } from './ModelSelector'
 import { useConsole } from '../hooks/useConsole'
 import { useTheme } from '../hooks/useTheme'
 import { Sun, Moon } from 'lucide-react'
+
+interface ProviderEntry {
+    id: string
+    label: string
+    color: string
+    available: boolean
+    models: { id: string; label: string }[]
+}
 
 const SUGGESTION_CHIPS = [
     { labelKey: 'creationChipEcommerce', fallback: 'E-commerce store' },
@@ -27,8 +35,11 @@ export function CreationView({ initialModel, initialModelProvider, onModelChange
     const [selectedModelProvider, setSelectedModelProvider] = useState(initialModelProvider)
     const [input, setInput] = useState('')
     const [phase, setPhase] = useState<'initial' | 'building' | 'success'>('initial')
+    const [modelReady, setModelReady] = useState(false)
+    const [providers, setProviders] = useState<ProviderEntry[]>([])
     const inputRef = useRef<HTMLTextAreaElement>(null)
     const messagesEndRef = useRef<HTMLDivElement>(null)
+    const modelSelectorRef = useRef<ModelSelectorHandle>(null)
 
     const {
         messages,
@@ -39,10 +50,12 @@ export function CreationView({ initialModel, initialModelProvider, onModelChange
         waitingForInput,
     } = useConsole(selectedModel, selectedModelProvider)
 
-    // Auto-focus the input on mount
+    // Auto-focus the input once model is ready
     useEffect(() => {
-        inputRef.current?.focus()
-    }, [])
+        if (modelReady && phase === 'initial') {
+            inputRef.current?.focus()
+        }
+    }, [modelReady, phase])
 
     // Transition to building phase on first message
     useEffect(() => {
@@ -69,13 +82,39 @@ export function CreationView({ initialModel, initialModelProvider, onModelChange
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
     }, [messages])
 
+    // Fetch provider catalog for the model picker and check initial model validity
+    useEffect(() => {
+        fetch('/api/models').then(r => r.json()).then(data => {
+            if (data.providers && Array.isArray(data.providers)) {
+                const providerList: ProviderEntry[] = data.providers
+                setProviders(providerList)
+                // If user already had a model stored, check it's still valid
+                if (selectedModel && selectedModelProvider) {
+                    const provider = providerList.find(p => p.id === selectedModelProvider && p.available)
+                    if (!provider) return
+                    // Custom OpenRouter model — valid if the provider is available
+                    const isCustomModel = selectedModelProvider === 'openrouter'
+                        && !provider.models.some(m => m.id === selectedModel)
+                    if (isCustomModel || provider.models.some(m => m.id === selectedModel)) {
+                        setModelReady(true)
+                    }
+                }
+            }
+        }).catch(() => {})
+    }, [])
+
     const handleModelChange = useCallback((modelId: string, modelProvider: string) => {
         setSelectedModel(modelId)
         setSelectedModelProvider(modelProvider)
+        setModelReady(true)
         onModelChange(modelId, modelProvider)
         localStorage.setItem('awel-model', modelId)
         localStorage.setItem('awel-model-provider', modelProvider)
     }, [onModelChange])
+
+    const handleModelReady = useCallback((valid: boolean) => {
+        setModelReady(valid)
+    }, [])
 
     const handleSubmit = useCallback((text?: string) => {
         const prompt = text || input.trim()
@@ -124,7 +163,7 @@ export function CreationView({ initialModel, initialModelProvider, onModelChange
     // ─── Initial + Building States ──────────────────────────
     return (
         <div className="h-screen bg-background flex flex-col overflow-hidden">
-            {/* Top bar */}
+            {/* Top bar — show ModelSelector in header once model is ready or in building phase */}
             <header className="flex items-center justify-between px-6 py-3 border-b border-border shrink-0">
                 <div className="flex items-center gap-2">
                     <span className="text-sm leading-none">🌸</span>
@@ -134,12 +173,16 @@ export function CreationView({ initialModel, initialModelProvider, onModelChange
                     )}
                 </div>
                 <div className="flex items-center gap-2">
-                    <ModelSelector
-                        selectedModel={selectedModel}
-                        selectedModelProvider={selectedModelProvider}
-                        onModelChange={handleModelChange}
-                        chatHasMessages={messages.length > 0}
-                    />
+                    {(modelReady || phase !== 'initial') && (
+                        <ModelSelector
+                            ref={modelSelectorRef}
+                            selectedModel={selectedModel}
+                            selectedModelProvider={selectedModelProvider}
+                            onModelChange={handleModelChange}
+                            onReady={handleModelReady}
+                            chatHasMessages={messages.length > 0}
+                        />
+                    )}
                     <Button
                         variant="ghost"
                         size="icon"
@@ -157,8 +200,45 @@ export function CreationView({ initialModel, initialModelProvider, onModelChange
 
             {/* Main content area */}
             <div className="flex-1 flex flex-col items-center min-h-0">
-                {phase === 'initial' ? (
-                    /* ─── Initial: centered prompt ─── */
+                {/* Step 1: pick a model */}
+                {phase === 'initial' && !modelReady && (
+                    <div className="flex-1 flex flex-col items-center justify-center w-full max-w-lg px-6">
+                        <h1 className="text-xl font-semibold text-foreground tracking-tight text-center">
+                            {t('chooseModelHeading', 'Select a model')}
+                        </h1>
+                        <p className="text-sm text-muted-foreground text-center mt-1.5 mb-6">
+                            {t('chooseModelFirst', 'Choose a model to get started.')}
+                        </p>
+
+                        {providers.filter(p => p.available && p.models.length > 0).length === 0 && providers.length > 0 && (
+                            <p className="text-xs text-muted-foreground">{t('noModelsAvailable', 'No models available. Configure a provider to continue.')}</p>
+                        )}
+
+                        <div className="w-full space-y-4">
+                            {providers.filter(p => p.available && p.models.length > 0).map(provider => (
+                                <div key={provider.id}>
+                                    <div className={`text-[10px] font-medium uppercase tracking-wider mb-1.5 px-1 ${provider.color || 'text-muted-foreground'}`}>
+                                        {provider.label}
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        {provider.models.map(m => (
+                                            <button
+                                                key={m.id}
+                                                onClick={() => handleModelChange(m.id, provider.id)}
+                                                className="px-3 py-2.5 rounded-lg border border-border bg-card text-left text-sm text-foreground hover:border-ring hover:bg-accent/50 transition-colors"
+                                            >
+                                                {m.label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {/* Step 2: describe what to build */}
+                {phase === 'initial' && modelReady && (
                     <div className="flex-1 flex flex-col items-center justify-center w-full max-w-2xl px-6">
                         <div className="text-center mb-8 space-y-3">
                             <h1 className="text-3xl font-semibold text-foreground tracking-tight">
@@ -169,7 +249,6 @@ export function CreationView({ initialModel, initialModelProvider, onModelChange
                             </p>
                         </div>
 
-                        {/* Suggestion chips */}
                         <div className="flex flex-wrap justify-center gap-2 mb-8">
                             {SUGGESTION_CHIPS.map((chip) => (
                                 <button
@@ -182,7 +261,6 @@ export function CreationView({ initialModel, initialModelProvider, onModelChange
                             ))}
                         </div>
 
-                        {/* Input */}
                         <div className="w-full">
                             <div className="flex gap-2 items-end">
                                 <div className="flex-1 bg-card border border-border rounded-xl focus-within:ring-2 focus-within:ring-ring/50 focus-within:border-ring">
@@ -207,10 +285,11 @@ export function CreationView({ initialModel, initialModelProvider, onModelChange
                             </div>
                         </div>
                     </div>
-                ) : (
-                    /* ─── Building: chat messages + input ─── */
+                )}
+
+                {/* Step 3: building */}
+                {phase === 'building' && (
                     <div className="flex-1 flex flex-col w-full max-w-3xl min-h-0">
-                        {/* Messages area */}
                         <div className="flex-1 overflow-y-auto p-6 space-y-3 min-h-0 break-words">
                             {renderedMessages}
                             {isLoading && !waitingForInput && (
@@ -222,7 +301,6 @@ export function CreationView({ initialModel, initialModelProvider, onModelChange
                             <div ref={messagesEndRef} />
                         </div>
 
-                        {/* Input area */}
                         <div className="border-t border-border p-4">
                             <div className="flex gap-2 items-end">
                                 <div className="flex-1 bg-card border border-border rounded-lg focus-within:ring-2 focus-within:ring-ring/50 focus-within:border-ring">

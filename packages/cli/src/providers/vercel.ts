@@ -10,12 +10,12 @@ import { pauseDevServer, resumeDevServer } from '../devserver.js';
 import { addToHistory, writeSSEEvent } from '../sse.js';
 import { awelTools } from '../tools/index.js';
 import { storePlan } from '../plan-store.js';
-import { startUndoSession, endUndoSession, pushSnapshot, getCurrentSessionStats } from '../undo.js';
-import { resolve } from 'path';
+import { startUndoSession, endUndoSession, getCurrentSessionStats } from '../undo.js';
 import { logEvent } from '../verbose.js';
+import { getAlwaysMemoryContext } from '../memory.js';
 import type { SSEStreamingApi } from 'hono/streaming';
 import type { ModelMessage } from 'ai';
-import type { StreamProvider, ProviderConfig, ResponseMessage } from './types.js';
+import type { StreamProvider, ProviderConfig, ResponseMessage, ProviderType } from './types.js';
 
 const SYSTEM_PROMPT = `You are Awel, an expert AI coding assistant. You help users build, modify, and understand their code projects.
 
@@ -37,6 +37,7 @@ You have access to these tools:
 - TodoRead: Read the current task list to check progress
 - TodoWrite: Create or update the task list to track multi-step work
 - RestartDevServer: Restart the user's dev server if it has crashed, is unresponsive, or needs a restart after config changes
+- Memory: Read, write, or search project memories. Memories persist across sessions. Actions: 'read' (list all), 'write' (save new entry), 'search' (find contextual memories by keyword). When writing: provide content, tags, and scope ('always' for project-wide rules, 'contextual' for specific patterns).
 
 React Best Practices:
 - When writing, reviewing, or refactoring React/Next.js code, use the ReactBestPractices tool to consult the performance guide. Request a specific section (e.g. "bundle", "rerender") when you know the area, or "all" for the full guide.
@@ -47,6 +48,14 @@ Guidelines:
 - Be concise in explanations
 - When making changes, explain what you did and why
 - If a task requires multiple steps, work through them methodically
+
+Memory:
+- When you discover important project patterns, conventions, or constraints during a task, save them using the Memory tool with action 'write'.
+- Use scope 'always' for things every conversation should know (tech stack, coding rules, directory structure).
+- Use scope 'contextual' for specific facts about particular files, components, or past decisions.
+- Write factual, specific content. Avoid vague generalizations.
+- Include relevant tags (file names, component names, library names) for better retrieval.
+- Before working on an unfamiliar part of the codebase, use Memory with action 'search' to check if there are relevant contextual memories from past sessions.
 
 Plan Mode:
 - When a user's request involves changes to 2 or more files, or any non-trivial multi-step work, you MUST use the ProposePlan tool FIRST before making any changes.
@@ -142,17 +151,26 @@ const ASK_USER_TOOLS = new Set(['AskUser', 'AskUserQuestion']);
 const PLAN_TOOLS = new Set(['ProposePlan', 'EnterPlanMode', 'ExitPlanMode']);
 const INTERACTIVE_TOOLS = new Set([...ASK_USER_TOOLS, ...PLAN_TOOLS]);
 
-export type VercelProviderType = 'claude-code' | 'anthropic' | 'openai' | 'google-ai' | 'vercel-gateway' | 'minimax' | 'zhipu' | 'openrouter';
-
-function createModel(modelId: string, providerType: VercelProviderType, cwd?: string) {
+function createModel(modelId: string, providerType: ProviderType, cwd?: string) {
     if (providerType === 'claude-code') {
+        let appendPrompt = 'IMPORTANT: Always respond in the same language the user writes in. If the user writes in Chinese, respond in Chinese. If the user writes in English, respond in English. Match the user\'s language throughout the conversation.';
+
+        // Inject always-scope memories for Claude Code
+        if (cwd) {
+            const memoryContext = getAlwaysMemoryContext(cwd);
+            if (memoryContext) {
+                appendPrompt += '\n\n' + memoryContext;
+            }
+        }
+
         return claudeCode(modelId, {
-            allowedTools: ['Read', 'Write', 'Edit', 'Bash', 'Glob', 'Ls', 'ProposePlan', 'AskUser'],
+            allowedTools: ['Read', 'Write', 'Edit', 'Bash', 'Glob', 'Ls', 'ProposePlan', 'AskUser', 'Skill'],
+            settingSources: ['project'],
             cwd,
             permissionMode: 'acceptEdits',
             streamingInput: 'always',
             maxTurns: 25,
-            appendSystemPrompt: 'IMPORTANT: Always respond in the same language the user writes in. If the user writes in Chinese, respond in Chinese. If the user writes in English, respond in English. Match the user\'s language throughout the conversation.',
+            appendSystemPrompt: appendPrompt,
         });
     } else if (providerType === 'anthropic') {
         const anthropic = createAnthropic({});
@@ -183,14 +201,14 @@ function createModel(modelId: string, providerType: VercelProviderType, cwd?: st
     }
 }
 
-export function createVercelProvider(modelId: string, providerType: VercelProviderType): StreamProvider {
+export function createVercelProvider(modelId: string, providerType: ProviderType): StreamProvider {
     return {
         async streamResponse(
             stream: SSEStreamingApi,
             messages: ModelMessage[],
             config: ProviderConfig
         ): Promise<ResponseMessage[]> {
-            const PROVIDER_LABELS: Record<VercelProviderType, string> = {
+            const PROVIDER_LABEL_MAP: Record<ProviderType, string> = {
                 'claude-code': 'Claude Code',
                 anthropic: 'Anthropic',
                 openai: 'OpenAI',
@@ -200,7 +218,7 @@ export function createVercelProvider(modelId: string, providerType: VercelProvid
                 zhipu: 'Zhipu AI',
                 openrouter: 'OpenRouter',
             };
-            const providerLabel = PROVIDER_LABELS[providerType];
+            const providerLabel = PROVIDER_LABEL_MAP[providerType];
             await writeSSEEvent(stream, 'status', {
                 type: 'status',
                 message: `Connecting to ${providerLabel}...`
@@ -240,8 +258,11 @@ export function createVercelProvider(modelId: string, providerType: VercelProvid
                 }
             }
 
-            // Start undo session to group all file changes from this agent run
-            startUndoSession();
+            // Start undo session to group all file changes from this agent run.
+            // Pass projectCwd so the session can capture a git baseline — this is
+            // essential for self-contained providers (Claude Code) where tool-call
+            // events arrive after the file has already been modified.
+            startUndoSession(config.projectCwd);
 
             let responseMessages: ResponseMessage[] = [];
 
@@ -249,9 +270,17 @@ export function createVercelProvider(modelId: string, providerType: VercelProvid
                 // Self-contained providers handle their own system prompt and tools internally.
                 // All other providers get our system prompt + tools.
                 const basePrompt = config.creationMode ? CREATION_SYSTEM_PROMPT : SYSTEM_PROMPT;
-                const systemPrompt = isSelfContained
+                let systemPrompt = isSelfContained
                     ? undefined
                     : `${basePrompt}\n\nThe user's project directory is: ${config.projectCwd}`;
+
+                // Inject always-scope memories into the system prompt
+                if (!isSelfContained && systemPrompt) {
+                    const memoryContext = getAlwaysMemoryContext(config.projectCwd);
+                    if (memoryContext) {
+                        systemPrompt += '\n\n' + memoryContext;
+                    }
+                }
 
                 const maxOutputTokens = process.env.AWEL_MAX_OUTPUT_TOKENS
                     ? parseInt(process.env.AWEL_MAX_OUTPUT_TOKENS, 10)
@@ -366,18 +395,6 @@ export function createVercelProvider(modelId: string, providerType: VercelProvid
                                     }
                                     pendingPlanContent = null;
                                     break;
-                                }
-
-                                // Snapshot files before Write/Edit execution for undo support.
-                                // This is essential for CLI providers (Claude Code, Gemini CLI) whose
-                                // built-in tools bypass Awel's tool implementations.
-                                if (part.toolName === 'Write' || part.toolName === 'Edit') {
-                                    const input = part.input as Record<string, unknown>;
-                                    const filePath = (input.file_path || input.filePath || '') as string;
-                                    if (filePath) {
-                                        const fullPath = filePath.startsWith('/') ? filePath : resolve(config.projectCwd, filePath);
-                                        pushSnapshot(fullPath);
-                                    }
                                 }
 
                                 // Capture Write calls to plan files for ExitPlanMode interception
@@ -543,12 +560,24 @@ export function createVercelProvider(modelId: string, providerType: VercelProvid
                 // (e.g. the assistant's plan/question tool call) so the session history
                 // stays consistent and avoids orphan user messages that cause 400 errors.
                 const externallyAborted = config.signal?.aborted;
+                let usage: {
+                    inputTokens?: number;
+                    outputTokens?: number;
+                    totalTokens?: number;
+                    inputTokenDetails?: { cacheReadTokens?: number; noCacheTokens?: number };
+                } | undefined;
                 if (!externallyAborted) {
                     try {
-                        const response = await result.response;
+                        const [response, usageResult, totalUsageResult] = await Promise.all([
+                            result.response,
+                            result.usage,
+                            result.totalUsage,
+                        ]);
                         responseMessages = response.messages;
-                    } catch {
-                        // If awaiting response fails (e.g. abort race), leave empty
+                        usage = totalUsageResult;
+                        logEvent('usage', `lastStep=${JSON.stringify(usageResult)} total=${JSON.stringify(totalUsageResult)}`);
+                    } catch (err) {
+                        logEvent('usage', `failed to resolve totalUsage: ${err instanceof Error ? err.message : String(err)}`);
                     }
                 }
 
@@ -569,6 +598,12 @@ export function createVercelProvider(modelId: string, providerType: VercelProvid
                         result: waitingForUserInput ? 'waiting_for_input' : 'completed',
                         is_error: false,
                         ...(fileStats && fileStats.length > 0 ? { file_stats: fileStats } : {}),
+                        ...(usage && {
+                            input_tokens: usage.inputTokens,
+                            output_tokens: usage.outputTokens,
+                            cache_read_tokens: usage.inputTokenDetails?.cacheReadTokens,
+                            cache_write_tokens: usage.inputTokenDetails?.noCacheTokens,
+                        }),
                     });
                     logEvent('stream:end', `duration=${durationMs}ms turns=${numTurns} result=${resultSubtype}`);
                     addToHistory('result', resultData);

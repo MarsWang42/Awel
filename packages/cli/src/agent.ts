@@ -3,10 +3,11 @@ import { streamSSE } from 'hono/streaming';
 import { EventEmitter } from 'node:events';
 import { z } from 'zod';
 import { addToHistory, getHistory, clearHistory } from './sse.js';
-import { getModelCatalogWithAvailability, getAvailableProviders } from './providers/registry.js';
+import { getProviderCatalog } from './providers/registry.js';
 import { getOrCreateSession, getSessionMessages, appendUserMessage, appendResponseMessages, resetSession } from './session.js';
 import { getActivePlan, approvePlan } from './plan-store.js';
 import { restartDevServer, getDevServerStatus } from './subprocess.js';
+import { readMemories, deleteMemory } from './memory.js';
 import type { Context } from 'hono';
 import type { SSEStreamingApi } from 'hono/streaming';
 
@@ -116,7 +117,7 @@ export function createAgentRoute(projectCwd: string, targetPort: number, isFresh
     // ─── Model Catalog ───────────────────────────────────────
 
     agent.get('/api/models', (c) => {
-        return c.json({ models: getModelCatalogWithAvailability(), providers: getAvailableProviders() });
+        return c.json({ providers: getProviderCatalog() });
     });
 
     // ─── Chat (trigger LLM) ─────────────────────────────────
@@ -198,6 +199,9 @@ export function createAgentRoute(projectCwd: string, targetPort: number, isFresh
                     console.error(`[awel] streamResponse rejected: ${msg}`);
                 })
                 .finally(() => {
+                    if (activeStreamAbort === abortController) {
+                        activeStreamAbort = null;
+                    }
                     if (!signal.aborted) {
                         streamBus.emit('end');
                     }
@@ -218,12 +222,27 @@ export function createAgentRoute(projectCwd: string, targetPort: number, isFresh
         return c.json({ ok: true });
     });
 
+    // ─── Stream Status ────────────────────────────────────────
+
+    agent.get('/api/stream/status', (c) => {
+        const active = activeStreamAbort !== null && !activeStreamAbort.signal.aborted;
+        return c.json({ active });
+    });
+
     // ─── SSE Stream (listener only) ──────────────────────────
 
     agent.get('/api/stream', async (c) => {
         setSSEHeaders(c);
 
+        const isReconnect = c.req.query('reconnect') === '1';
+
         return streamSSE(c, async (stream) => {
+            // If reconnecting but the stream already finished, close immediately.
+            if (isReconnect && (activeStreamAbort === null || activeStreamAbort.signal.aborted)) {
+                await stream.writeSSE({ event: 'done', data: '{}' });
+                return;
+            }
+
             await new Promise<void>((resolve) => {
                 const onSSE = async (entry: { event: string; data: string }) => {
                     try {
@@ -232,12 +251,12 @@ export function createAgentRoute(projectCwd: string, targetPort: number, isFresh
                         cleanup();
                     }
                 };
-                const onEnd = () => cleanup();
                 const cleanup = () => {
                     streamBus.off('sse', onSSE);
                     streamBus.off('end', onEnd);
                     resolve();
                 };
+                const onEnd = () => cleanup();
                 stream.onAbort(() => cleanup());
                 streamBus.on('sse', onSSE);
                 streamBus.once('end', onEnd);
@@ -312,6 +331,21 @@ export function createAgentRoute(projectCwd: string, targetPort: number, isFresh
 
     agent.get('/api/project-info', (c) => {
         return c.json({ projectCwd });
+    });
+
+    // ─── Memories API ───────────────────────────────────────
+
+    agent.get('/api/memories', (c) => {
+        return c.json({ memories: readMemories(projectCwd) });
+    });
+
+    agent.delete('/api/memories/:id', (c) => {
+        const id = c.req.param('id');
+        const deleted = deleteMemory(projectCwd, id);
+        if (!deleted) {
+            return c.json({ success: false, error: 'Memory not found' }, 404);
+        }
+        return c.json({ success: true });
     });
 
     return agent;

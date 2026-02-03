@@ -1,18 +1,46 @@
 import { program } from 'commander';
+import { existsSync, readFileSync } from 'node:fs';
+import { resolve, join } from 'node:path';
 import { startServer } from './server.js';
 import { AWEL_PORT, USER_APP_PORT } from './config.js';
 import { setVerbose } from './verbose.js';
 import { ensureBabelPlugin } from './babel-setup.js';
 import { ensureProvider } from './onboarding.js';
+import { ensureMemorySkill } from './skills.js';
 import { awel } from './logger.js';
 import { spawnDevServer } from './subprocess.js';
 import { writeAwelConfig, isProjectFresh } from './awel-config.js';
-import { resolve } from 'path';
+import { initHistory } from './sse.js';
+import { initSession } from './session.js';
 
 program
     .name('awel')
-    .description('AI-powered development overlay for Next.js')
+    .description('AI-powered development overlay for Next.js & React')
     .version('0.1.0');
+
+type ProjectFramework = 'nextjs' | 'react' | null;
+
+function detectFramework(cwd: string): ProjectFramework {
+    // Next.js: config file or `next` in dependencies
+    const nextConfigs = ['next.config.js', 'next.config.mjs', 'next.config.ts'];
+    if (nextConfigs.some(f => existsSync(join(cwd, f)))) return 'nextjs';
+
+    const pkgPath = join(cwd, 'package.json');
+    if (!existsSync(pkgPath)) return null;
+
+    let pkg: any;
+    try {
+        pkg = JSON.parse(readFileSync(pkgPath, 'utf-8'));
+    } catch {
+        return null;
+    }
+
+    const deps = { ...pkg.dependencies, ...pkg.devDependencies };
+    if (deps.next) return 'nextjs';
+    if (deps.react) return 'react';
+
+    return null;
+}
 
 program
     .command('dev')
@@ -23,10 +51,27 @@ program
         const targetPort = parseInt(options.port, 10);
         if (options.verbose) setVerbose(true);
 
-        const fresh = isProjectFresh(process.cwd());
+        const cwd = process.cwd();
+        const framework = detectFramework(cwd);
 
-        await ensureProvider(process.cwd());
-        if (!fresh) await ensureBabelPlugin(process.cwd());
+        if (!framework) {
+            awel.error('This directory does not appear to be a React project.');
+            awel.error('Awel requires a React app (Next.js, Vite, CRA, etc.) to run.');
+            awel.error('Make sure you are in a directory with `react` in package.json.');
+            awel.error('');
+            awel.error('To create a new Next.js project, run: npx awel create');
+            process.exit(1);
+        }
+
+        const fresh = isProjectFresh(cwd);
+
+        await ensureProvider(cwd);
+        if (!fresh && framework === 'nextjs') await ensureBabelPlugin(cwd);
+        await ensureMemorySkill(cwd);
+
+        // Restore chat history and session from previous run
+        initHistory(cwd);
+        initSession(cwd);
 
         awel.log('🌟 Starting Awel...');
         if (fresh) awel.log('   Mode: Creation (new project)');
@@ -35,10 +80,10 @@ program
         awel.log('');
 
         // Start the Awel control server (proxy + dashboard)
-        await startServer({ awelPort: AWEL_PORT, targetPort, projectCwd: process.cwd(), fresh });
+        await startServer({ awelPort: AWEL_PORT, targetPort, projectCwd: cwd, fresh });
 
-        // Start the user's Next.js app via subprocess manager (handles auto-restart)
-        await spawnDevServer({ port: targetPort, cwd: process.cwd() });
+        // Start the user's dev server via subprocess manager (handles auto-restart)
+        await spawnDevServer({ port: targetPort, cwd: cwd });
 
         awel.log('');
         if (fresh) {

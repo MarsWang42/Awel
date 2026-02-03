@@ -4,6 +4,7 @@ import { CheckCircle2, AlertCircle, Clock, DollarSign, Undo2, Eye } from 'lucide
 import type { ResultSubtype } from '../../types/messages'
 import type { FileDiff } from '../DiffModal'
 import { ConfirmDialog } from '../ui/confirm-dialog'
+import { Tooltip } from '../ui/tooltip'
 
 interface FileStat {
     relativePath: string
@@ -20,6 +21,10 @@ interface ResultMessageProps {
     numTurns?: number
     durationMs?: number
     totalCostUsd?: number
+    inputTokens?: number
+    outputTokens?: number
+    cacheReadTokens?: number
+    cacheWriteTokens?: number
     fileStats?: FileStat[]
     undone?: boolean
     isLatest?: boolean
@@ -42,6 +47,10 @@ export function ResultMessage({
     numTurns,
     durationMs,
     totalCostUsd,
+    inputTokens,
+    outputTokens,
+    cacheReadTokens,
+    cacheWriteTokens,
     fileStats,
     undone,
     isLatest,
@@ -207,6 +216,22 @@ export function ResultMessage({
                 {duration && (
                     <span>{duration}s</span>
                 )}
+                {(inputTokens != null || outputTokens != null) && (() => {
+                    const inTotal = inputTokens ?? 0
+                    const out = outputTokens ?? 0
+                    const cached = cacheReadTokens ?? 0
+                    const nonCached = inTotal - cached
+                    const display = nonCached + out
+                    const tooltipParts = [`In: ${nonCached.toLocaleString()}`]
+                    if (cached > 0) tooltipParts.push(`Cache read: ${cached.toLocaleString()}`)
+                    if (cacheWriteTokens) tooltipParts.push(`Cache write: ${cacheWriteTokens.toLocaleString()}`)
+                    tooltipParts.push(`Out: ${out.toLocaleString()}`)
+                    return (
+                        <Tooltip text={tooltipParts.join(' / ')}>
+                            <span>{display.toLocaleString()} tokens</span>
+                        </Tooltip>
+                    )
+                })()}
                 {totalCostUsd !== undefined && totalCostUsd > 0 && (
                     <span className="flex items-center gap-0.5">
                         <DollarSign className="w-3 h-3" />

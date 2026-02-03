@@ -70,6 +70,10 @@ export function parseSSEData(eventType: string, rawData: string): Partial<Parsed
                     numTurns: data.num_turns,
                     durationMs: data.duration_ms,
                     totalCostUsd: data.total_cost_usd,
+                    inputTokens: data.input_tokens,
+                    outputTokens: data.output_tokens,
+                    cacheReadTokens: data.cache_read_tokens,
+                    cacheWriteTokens: data.cache_write_tokens,
                     fileStats: data.file_stats,
                     isError: data.is_error || data.subtype !== 'success',
                 }
@@ -105,6 +109,10 @@ export function parseSSEData(eventType: string, rawData: string): Partial<Parsed
                         numTurns: data.num_turns,
                         durationMs: data.duration_ms,
                         totalCostUsd: data.total_cost_usd,
+                        inputTokens: data.input_tokens,
+                        outputTokens: data.output_tokens,
+                        cacheReadTokens: data.cache_read_tokens,
+                        cacheWriteTokens: data.cache_write_tokens,
                         fileStats: data.file_stats,
                         isError: data.is_error || data.subtype !== 'success',
                     }

@@ -1,67 +1,118 @@
 import { execSync } from 'node:child_process';
 import { createVercelProvider } from './vercel.js';
-import type { VercelProviderType } from './vercel.js';
-import type { StreamProvider, ModelDefinition } from './types.js';
+import type { StreamProvider, ProviderType, ProviderCatalogEntry, ProviderEntry } from './types.js';
 
-// ─── Model Catalog ───────────────────────────────────────────
+// ─── Provider Catalog ─────────────────────────────────────────
 
-const MODEL_CATALOG: ModelDefinition[] = [
-    // Claude Code models (via ai-sdk-provider-claude-code — uses Claude CLI binary, no API key)
-    { id: 'sonnet', label: 'Claude Sonnet', provider: 'claude-code' },
-    { id: 'opus', label: 'Claude Opus', provider: 'claude-code' },
-    { id: 'haiku', label: 'Claude Haiku', provider: 'claude-code' },
-
-    // Anthropic API models (@ai-sdk/anthropic — uses ANTHROPIC_API_KEY)
-    { id: 'claude-sonnet-4-5', label: 'Claude Sonnet 4.5', provider: 'anthropic' },
-    { id: 'claude-opus-4-5', label: 'Claude Opus 4.5', provider: 'anthropic' },
-    { id: 'claude-haiku-4-5', label: 'Claude Haiku 4.5', provider: 'anthropic' },
-
-    // OpenAI models (@ai-sdk/openai)
-    { id: 'gpt-5.2-codex', label: 'GPT-5.2 Codex', provider: 'openai' },
-    { id: 'gpt-5.1-codex', label: 'GPT-5.1 Codex', provider: 'openai' },
-    { id: 'gpt-5.2-pro', label: 'GPT-5.2 Pro', provider: 'openai' },
-    { id: 'gpt-5.2-chat-latest', label: 'GPT-5.2 Chat Latest', provider: 'openai' },
-    { id: 'gpt-5-nano', label: 'GPT-5 Nano', provider: 'openai' },
-    { id: 'gpt-5-mini', label: 'GPT-5 Mini', provider: 'openai' },
-
-    // Google AI models (@ai-sdk/google)
-    { id: 'gemini-3-pro-preview', label: 'Gemini 3 Pro', provider: 'google-ai' },
-    { id: 'gemini-3-flash-preview', label: 'Gemini 3 Flash', provider: 'google-ai' },
-    { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro', provider: 'google-ai' },
-    { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash', provider: 'google-ai' },
-
-    // MiniMax models (vercel-minimax-ai-provider — uses MINIMAX_API_KEY)
-    { id: 'MiniMax-M2', label: 'MiniMax M2', provider: 'minimax' },
-
-    // Zhipu AI models (zhipu-ai-provider — uses ZHIPU_API_KEY)
-    { id: 'glm-4-plus', label: 'GLM-4 Plus', provider: 'zhipu' },
-    { id: 'glm-4-flash', label: 'GLM-4 Flash', provider: 'zhipu' },
-    { id: 'glm-4-long', label: 'GLM-4 Long', provider: 'zhipu' },
-
-    // Vercel AI Gateway — Claude models via gateway (Claude Max / API key)
-    { id: 'anthropic/claude-sonnet-4-5', label: 'Sonnet 4.5 (Gateway)', provider: 'vercel-gateway' },
-    { id: 'anthropic/claude-opus-4-5', label: 'Opus 4.5 (Gateway)', provider: 'vercel-gateway' },
-    { id: 'anthropic/claude-sonnet-4', label: 'Sonnet 4 (Gateway)', provider: 'vercel-gateway' },
-    { id: 'anthropic/claude-opus-4', label: 'Opus 4 (Gateway)', provider: 'vercel-gateway' },
+const PROVIDER_CATALOG: ProviderCatalogEntry[] = [
+    {
+        id: 'claude-code',
+        label: 'Claude Code',
+        color: 'text-orange-600 dark:text-orange-400',
+        envVar: null,
+        models: [
+            { id: 'sonnet', label: 'Claude Sonnet' },
+            { id: 'opus', label: 'Claude Opus' },
+            { id: 'haiku', label: 'Claude Haiku' },
+        ],
+    },
+    {
+        id: 'anthropic',
+        label: 'Anthropic API',
+        color: 'text-orange-600 dark:text-orange-400',
+        envVar: 'ANTHROPIC_API_KEY',
+        models: [
+            { id: 'claude-sonnet-4-5', label: 'Claude Sonnet 4.5' },
+            { id: 'claude-opus-4-5', label: 'Claude Opus 4.5' },
+            { id: 'claude-haiku-4-5', label: 'Claude Haiku 4.5' },
+        ],
+    },
+    {
+        id: 'openai',
+        label: 'OpenAI',
+        color: 'text-green-600 dark:text-green-400',
+        envVar: 'OPENAI_API_KEY',
+        models: [
+            { id: 'gpt-5.2-codex', label: 'GPT-5.2 Codex' },
+            { id: 'gpt-5.1-codex', label: 'GPT-5.1 Codex' },
+            { id: 'gpt-5.2-pro', label: 'GPT-5.2 Pro' },
+            { id: 'gpt-5.2-chat-latest', label: 'GPT-5.2 Chat Latest' },
+            { id: 'gpt-5-nano', label: 'GPT-5 Nano' },
+            { id: 'gpt-5-mini', label: 'GPT-5 Mini' },
+        ],
+    },
+    {
+        id: 'google-ai',
+        label: 'Google AI',
+        color: 'text-blue-600 dark:text-blue-400',
+        envVar: 'GOOGLE_GENERATIVE_AI_API_KEY',
+        models: [
+            { id: 'gemini-3-pro-preview', label: 'Gemini 3 Pro' },
+            { id: 'gemini-3-flash-preview', label: 'Gemini 3 Flash' },
+            { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
+            { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
+        ],
+    },
+    {
+        id: 'minimax',
+        label: 'MiniMax',
+        color: 'text-pink-600 dark:text-pink-400',
+        envVar: 'MINIMAX_API_KEY',
+        models: [
+            { id: 'MiniMax-M2', label: 'MiniMax M2' },
+        ],
+    },
+    {
+        id: 'zhipu',
+        label: 'Zhipu AI',
+        color: 'text-cyan-600 dark:text-cyan-400',
+        envVar: 'ZHIPU_API_KEY',
+        models: [
+            { id: 'glm-4-plus', label: 'GLM-4 Plus' },
+            { id: 'glm-4-flash', label: 'GLM-4 Flash' },
+            { id: 'glm-4-long', label: 'GLM-4 Long' },
+        ],
+    },
+    {
+        id: 'vercel-gateway',
+        label: 'Vercel AI Gateway',
+        color: 'text-purple-600 dark:text-purple-400',
+        envVar: 'AI_GATEWAY_API_KEY',
+        models: [
+            { id: 'anthropic/claude-sonnet-4-5', label: 'Sonnet 4.5 (Gateway)' },
+            { id: 'anthropic/claude-opus-4-5', label: 'Opus 4.5 (Gateway)' },
+            { id: 'anthropic/claude-sonnet-4', label: 'Sonnet 4 (Gateway)' },
+            { id: 'anthropic/claude-opus-4', label: 'Opus 4 (Gateway)' },
+        ],
+    },
+    {
+        id: 'openrouter',
+        label: 'OpenRouter',
+        color: 'text-teal-600 dark:text-teal-400',
+        envVar: 'OPENROUTER_API_KEY',
+        customModelInput: true,
+        models: [],
+    },
 ];
 
-export const PROVIDER_ENV_KEYS: Record<string, string> = {
-    // claude-code: uses Claude Code CLI binary, checked separately
-    anthropic: 'ANTHROPIC_API_KEY',
-    openai: 'OPENAI_API_KEY',
-    'google-ai': 'GOOGLE_GENERATIVE_AI_API_KEY',
-    'vercel-gateway': 'AI_GATEWAY_API_KEY',
-    minimax: 'MINIMAX_API_KEY',
-    zhipu: 'ZHIPU_API_KEY',
-    openrouter: 'OPENROUTER_API_KEY',
-};
+// ─── Derived Maps (for consumers that need simple key→value lookups) ──
+
+export const PROVIDER_ENV_KEYS: Record<string, string> = Object.fromEntries(
+    PROVIDER_CATALOG.filter(p => p.envVar).map(p => [p.id, p.envVar!])
+);
+
+export const PROVIDER_LABELS: Record<string, string> = Object.fromEntries(
+    PROVIDER_CATALOG.map(p => [p.id, p.label])
+);
+
+// ─── Binary Check ─────────────────────────────────────────────
 
 /**
  * Checks whether the `claude` CLI binary is available in PATH.
  * Cached after first call since the binary won't appear/disappear mid-session.
  */
 let _claudeBinaryAvailable: boolean | null = null;
-function isClaudeBinaryAvailable(): boolean {
+export function isClaudeBinaryAvailable(): boolean {
     if (_claudeBinaryAvailable !== null) return _claudeBinaryAvailable;
     try {
         execSync('which claude', { stdio: 'ignore' });
@@ -72,116 +123,39 @@ function isClaudeBinaryAvailable(): boolean {
     return _claudeBinaryAvailable;
 }
 
-// ─── Provider Availability ────────────────────────────────────
-
-export const PROVIDER_LABELS: Record<string, string> = {
-    'claude-code': 'Claude Code',
-    anthropic: 'Anthropic API',
-    openai: 'OpenAI',
-    'google-ai': 'Google AI',
-    'vercel-gateway': 'Vercel AI Gateway',
-    minimax: 'MiniMax',
-    zhipu: 'Zhipu AI',
-    openrouter: 'OpenRouter',
-};
-
-export interface ProviderAvailability {
-    provider: string;
-    label: string;
-    available: boolean;
-    envVar: string | null;
-}
+// ─── Provider Catalog API ─────────────────────────────────────
 
 /**
- * Returns deduplicated provider availability info.
- * Checks each provider once (claude-code via binary check, others via env var).
+ * Returns the full provider catalog with availability info.
+ * Each provider entry includes its nested models, availability status,
+ * and an optional unavailableReason.
  */
-export function getAvailableProviders(): ProviderAvailability[] {
-    // Collect providers referenced by catalog entries
-    const seen = new Set<string>();
-    const result: ProviderAvailability[] = [];
-
-    for (const model of MODEL_CATALOG) {
-        if (seen.has(model.provider)) continue;
-        seen.add(model.provider);
-
-        const label = PROVIDER_LABELS[model.provider] ?? model.provider;
-
-        if (model.provider === 'claude-code') {
-            result.push({
-                provider: model.provider,
-                label,
-                available: isClaudeBinaryAvailable(),
-                envVar: null,
-            });
-            continue;
-        }
-
-        const envKey = PROVIDER_ENV_KEYS[model.provider];
-        result.push({
-            provider: model.provider,
-            label,
-            available: envKey ? !!process.env[envKey] : true,
-            envVar: envKey ?? null,
-        });
-    }
-
-    // Ensure providers with env keys but no catalog entries are still listed (e.g. OpenRouter)
-    for (const [provider, envKey] of Object.entries(PROVIDER_ENV_KEYS)) {
-        if (seen.has(provider)) continue;
-        seen.add(provider);
-        const label = PROVIDER_LABELS[provider] ?? provider;
-        result.push({
-            provider,
-            label,
-            available: !!process.env[envKey],
-            envVar: envKey,
-        });
-    }
-
-    return result;
-}
-
-// ─── Provider Resolution ─────────────────────────────────────
-
-export function resolveProvider(modelId: string, modelProvider: string): { provider: StreamProvider; modelProvider: string } {
-    return { provider: createVercelProvider(modelId, modelProvider as VercelProviderType), modelProvider };
-}
-
-// ─── Model Catalog API ───────────────────────────────────────
-
-export interface ModelWithAvailability extends ModelDefinition {
-    available: boolean;
-    unavailableReason?: string;
-}
-
-/**
- * Returns the model catalog enriched with availability info.
- * Each entry includes `available: boolean` and an optional `unavailableReason`.
- * The `claude-code` provider checks for the `claude` CLI binary instead of an env var.
- * Providers without a known env key mapping default to available.
- */
-export function getModelCatalogWithAvailability(): ModelWithAvailability[] {
-    return MODEL_CATALOG.map((model) => {
-        // Claude Code provider: check for the `claude` binary, not an API key
-        if (model.provider === 'claude-code') {
+export function getProviderCatalog(): ProviderEntry[] {
+    return PROVIDER_CATALOG.map((entry) => {
+        if (entry.id === 'claude-code') {
             const hasBinary = isClaudeBinaryAvailable();
             return {
-                ...model,
+                ...entry,
                 available: hasBinary,
                 ...(!hasBinary && { unavailableReason: 'Claude Code CLI not installed' }),
             };
         }
 
-        const envKey = PROVIDER_ENV_KEYS[model.provider];
-        if (!envKey) {
-            return { ...model, available: true };
+        if (!entry.envVar) {
+            return { ...entry, available: true };
         }
-        const hasKey = !!process.env[envKey];
+
+        const hasKey = !!process.env[entry.envVar];
         return {
-            ...model,
+            ...entry,
             available: hasKey,
-            ...(!hasKey && { unavailableReason: `${envKey} not set` }),
+            ...(!hasKey && { unavailableReason: `${entry.envVar} not set` }),
         };
     });
+}
+
+// ─── Provider Resolution ─────────────────────────────────────
+
+export function resolveProvider(modelId: string, modelProvider: string): { provider: StreamProvider; modelProvider: string } {
+    return { provider: createVercelProvider(modelId, modelProvider as ProviderType), modelProvider };
 }

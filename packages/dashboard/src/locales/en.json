@@ -74,5 +74,8 @@
     "creationChipPortfolio": "Portfolio site",
     "useModel": "Use",
     "customModelPlaceholder": "e.g. deepseek/deepseek-r1",
-    "allProviders": "All Providers"
+    "allProviders": "All Providers",
+    "chooseModelFirst": "Choose a model to get started.",
+    "chooseModelHeading": "Select a model",
+    "noModelsAvailable": "No models available. Configure a provider to continue."
 }

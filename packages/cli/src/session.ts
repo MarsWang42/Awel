@@ -3,7 +3,12 @@
 // The provider is cached and reused across requests; a model switch
 // swaps the provider while preserving message history (unless switching
 // to or from the self-contained claude-code provider).
+//
+// Session messages are persisted to .awel/session.json so the LLM
+// retains full conversation context across `awel dev` restarts.
 
+import { existsSync, readFileSync, writeFileSync, mkdirSync, unlinkSync } from 'fs';
+import { join } from 'path';
 import { resolveProvider } from './providers/registry.js';
 import type { StreamProvider, ResponseMessage } from './providers/types.js';
 import type { ModelMessage, UserContent } from 'ai';
@@ -15,7 +20,64 @@ interface ChatSession {
     messages: ModelMessage[];
 }
 
+interface PersistedSession {
+    modelId: string;
+    modelProvider: string;
+    messages: ModelMessage[];
+}
+
 let session: ChatSession | null = null;
+let _projectCwd: string | null = null;
+
+// ─── Disk Persistence ────────────────────────────────────────
+
+function sessionPath(): string | null {
+    if (!_projectCwd) return null;
+    return join(_projectCwd, '.awel', 'session.json');
+}
+
+function saveToDisk(): void {
+    if (!session) return;
+    const filePath = sessionPath();
+    if (!filePath) return;
+    try {
+        const dir = join(_projectCwd!, '.awel');
+        if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+        const data: PersistedSession = {
+            modelId: session.modelId,
+            modelProvider: session.modelProvider,
+            messages: session.messages,
+        };
+        writeFileSync(filePath, JSON.stringify(data) + '\n', 'utf-8');
+    } catch {
+        // Non-critical
+    }
+}
+
+/**
+ * Initialize session persistence. Restores the previous session from disk.
+ * Must be called before the server starts.
+ */
+export function initSession(projectCwd: string): void {
+    _projectCwd = projectCwd;
+    const filePath = sessionPath();
+    if (!filePath || !existsSync(filePath)) return;
+    try {
+        const raw = readFileSync(filePath, 'utf-8');
+        const persisted: PersistedSession = JSON.parse(raw);
+        if (persisted.modelId && persisted.modelProvider && Array.isArray(persisted.messages)) {
+            const { provider } = resolveProvider(persisted.modelId, persisted.modelProvider);
+            session = {
+                modelId: persisted.modelId,
+                modelProvider: persisted.modelProvider,
+                provider,
+                messages: persisted.messages,
+            };
+        }
+    } catch {
+        // Corrupt file — start fresh
+    }
+}
 
 /**
  * Returns the existing session if the model matches, otherwise creates a new
@@ -44,6 +106,7 @@ export function getOrCreateSession(modelId: string, modelProvider: string): { pr
         provider,
         messages: canPreserveMessages ? session!.messages : [],
     };
+    saveToDisk();
     return { provider: session.provider };
 }
 
@@ -73,6 +136,7 @@ export function getSessionMessages(prompt: string | UserContent): ModelMessage[]
     // Also fix the actual session to prevent accumulation
     if (messages.length !== session.messages.length) {
         session.messages = messages;
+        saveToDisk();
     }
 
     return [...messages, userMessage];
@@ -84,6 +148,7 @@ export function getSessionMessages(prompt: string | UserContent): ModelMessage[]
 export function appendUserMessage(content: string | UserContent): void {
     if (!session) return;
     session.messages.push({ role: 'user', content });
+    saveToDisk();
 }
 
 /**
@@ -92,6 +157,7 @@ export function appendUserMessage(content: string | UserContent): void {
 export function appendResponseMessages(msgs: ResponseMessage[]): void {
     if (!session) return;
     session.messages.push(...msgs);
+    saveToDisk();
 }
 
 /**
@@ -99,4 +165,8 @@ export function appendResponseMessages(msgs: ResponseMessage[]): void {
  */
 export function resetSession(): void {
     session = null;
+    const filePath = sessionPath();
+    if (filePath && existsSync(filePath)) {
+        try { unlinkSync(filePath); } catch { /* ignore */ }
+    }
 }

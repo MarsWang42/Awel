@@ -20,8 +20,23 @@ export interface StreamProvider {
     ): Promise<ResponseMessage[]>;
 }
 
-export interface ModelDefinition {
+export type ProviderType = 'claude-code' | 'anthropic' | 'openai' | 'google-ai' | 'vercel-gateway' | 'minimax' | 'zhipu' | 'openrouter';
+
+export interface ModelEntry {
     id: string;
     label: string;
-    provider: 'claude-code' | 'anthropic' | 'openai' | 'google-ai' | 'vercel-gateway' | 'minimax' | 'zhipu' | 'openrouter';
+}
+
+export interface ProviderCatalogEntry {
+    id: ProviderType;
+    label: string;
+    color: string;
+    envVar: string | null;
+    customModelInput?: boolean;
+    models: ModelEntry[];
+}
+
+export interface ProviderEntry extends ProviderCatalogEntry {
+    available: boolean;
+    unavailableReason?: string;
 }

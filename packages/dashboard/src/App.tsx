@@ -1,10 +1,10 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { X, Maximize2, Minimize2, Trash2, Sun, Moon } from 'lucide-react'
 import { Button } from './components/ui/button'
 import { ConfirmDialog } from './components/ui/confirm-dialog'
 import { Console } from './components/Console'
-import { ModelSelector } from './components/ModelSelector'
+import { ModelSelector, type ModelSelectorHandle } from './components/ModelSelector'
 import { DiffModal, type FileDiff } from './components/DiffModal'
 import { CreationView } from './components/CreationView'
 import { useTheme } from './hooks/useTheme'
@@ -26,6 +26,8 @@ function App() {
     const [isStreaming, setIsStreaming] = useState(false)
     const [reviewDiffs, setReviewDiffs] = useState<FileDiff[] | null>(null)
     const [showClearConfirm, setShowClearConfirm] = useState(false)
+    const [modelReady, setModelReady] = useState(false)
+    const modelSelectorRef = useRef<ModelSelectorHandle>(null)
 
     const handleReviewOpen = useCallback((diffs: FileDiff[]) => {
         setReviewDiffs(diffs)
@@ -46,9 +48,18 @@ function App() {
     const handleModelChange = (modelId: string, modelProvider: string) => {
         setSelectedModel(modelId)
         setSelectedModelProvider(modelProvider)
+        setModelReady(true)
         localStorage.setItem('awel-model', modelId)
         localStorage.setItem('awel-model-provider', modelProvider)
     }
+
+    const handleModelReady = useCallback((valid: boolean) => {
+        setModelReady(valid)
+    }, [])
+
+    const handleModelRequired = useCallback(() => {
+        modelSelectorRef.current?.open()
+    }, [])
 
     const handleHasMessagesChange = useCallback((hasMessages: boolean) => {
         setChatHasMessages(hasMessages)
@@ -100,9 +111,11 @@ function App() {
                     </div>
                     <div className="flex items-center gap-2">
                         <ModelSelector
+                            ref={modelSelectorRef}
                             selectedModel={selectedModel}
                             selectedModelProvider={selectedModelProvider}
                             onModelChange={handleModelChange}
+                            onReady={handleModelReady}
                             chatHasMessages={chatHasMessages}
                         />
                         <Button
@@ -150,6 +163,8 @@ function App() {
                     key={chatKey}
                     selectedModel={selectedModel}
                     selectedModelProvider={selectedModelProvider}
+                    modelReady={modelReady}
+                    onModelRequired={handleModelRequired}
                     onHasMessagesChange={handleHasMessagesChange}
                     onStreamingChange={setIsStreaming}
                     onReviewDiffs={handleReviewOpen}

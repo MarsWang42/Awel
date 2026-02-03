@@ -2,7 +2,6 @@ import { tool } from 'ai';
 import { z } from 'zod';
 import { writeFileSync, mkdirSync } from 'fs';
 import { resolve, dirname } from 'path';
-import { pushSnapshot } from '../undo.js';
 
 export function createWriteTool(cwd: string) {
     return tool({
@@ -14,7 +13,6 @@ export function createWriteTool(cwd: string) {
         execute: async ({ file_path, content }) => {
             const fullPath = file_path.startsWith('/') ? file_path : resolve(cwd, file_path);
             try {
-                pushSnapshot(fullPath);
                 mkdirSync(dirname(fullPath), { recursive: true });
                 writeFileSync(fullPath, content, 'utf-8');
                 return `Successfully wrote to ${file_path}`;

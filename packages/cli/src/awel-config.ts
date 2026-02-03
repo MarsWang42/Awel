@@ -6,6 +6,7 @@ export interface AwelConfig {
     onboarded?: boolean;
     fresh?: boolean;
     createdAt?: string;
+    skillsInstalled?: boolean;
 }
 
 export function readAwelConfig(projectCwd: string): AwelConfig {

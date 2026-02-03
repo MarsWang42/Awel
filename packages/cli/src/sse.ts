@@ -1,3 +1,5 @@
+import { existsSync, readFileSync, writeFileSync, mkdirSync, unlinkSync } from 'fs';
+import { join } from 'path';
 import type { SSEStreamingApi } from 'hono/streaming';
 
 // ─── Chat History Storage ────────────────────────────────────
@@ -9,12 +11,58 @@ export interface ChatMessage {
     timestamp: number;
 }
 
-// In-memory chat history (persists for the lifetime of the CLI process)
+// In-memory chat history, optionally backed by disk
 const chatHistory: ChatMessage[] = [];
 const MAX_HISTORY = 500; // Limit to prevent memory bloat
 
 // Event types that should not be persisted in history
 const TRANSIENT_EVENTS = new Set(['status', 'done']);
+
+// ─── Disk Persistence ────────────────────────────────────────
+
+let _projectCwd: string | null = null;
+let _flushTimer: ReturnType<typeof setTimeout> | null = null;
+
+function historyPath(): string | null {
+    if (!_projectCwd) return null;
+    return join(_projectCwd, '.awel', 'history.json');
+}
+
+function flushToDisk(): void {
+    const filePath = historyPath();
+    if (!filePath) return;
+    try {
+        const dir = join(_projectCwd!, '.awel');
+        if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+        writeFileSync(filePath, JSON.stringify(chatHistory) + '\n', 'utf-8');
+    } catch {
+        // Non-critical — history will be lost on restart but nothing breaks
+    }
+}
+
+function scheduleFlush(): void {
+    if (_flushTimer) clearTimeout(_flushTimer);
+    _flushTimer = setTimeout(flushToDisk, 500);
+}
+
+/**
+ * Initialize history persistence. Loads existing history from disk.
+ * Must be called before the server starts.
+ */
+export function initHistory(projectCwd: string): void {
+    _projectCwd = projectCwd;
+    const filePath = historyPath();
+    if (!filePath || !existsSync(filePath)) return;
+    try {
+        const raw = readFileSync(filePath, 'utf-8');
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+            chatHistory.push(...parsed.slice(-MAX_HISTORY));
+        }
+    } catch {
+        // Corrupt file — start fresh
+    }
+}
 
 export function addToHistory(eventType: string, data: string): void {
     if (TRANSIENT_EVENTS.has(eventType)) return;
@@ -29,6 +77,7 @@ export function addToHistory(eventType: string, data: string): void {
                 if (lastParsed.type === 'text' && newParsed.type === 'text') {
                     lastParsed.text = (lastParsed.text || '') + (newParsed.text || '');
                     last.data = JSON.stringify(lastParsed);
+                    scheduleFlush();
                     return;
                 }
             } catch {
@@ -47,6 +96,14 @@ export function addToHistory(eventType: string, data: string): void {
     if (chatHistory.length > MAX_HISTORY) {
         chatHistory.splice(0, chatHistory.length - MAX_HISTORY);
     }
+
+    // Flush immediately on stream-ending events, debounce otherwise
+    if (eventType === 'result' || eventType === 'error') {
+        if (_flushTimer) clearTimeout(_flushTimer);
+        flushToDisk();
+    } else {
+        scheduleFlush();
+    }
 }
 
 export function getHistory(): ChatMessage[] {
@@ -55,6 +112,11 @@ export function getHistory(): ChatMessage[] {
 
 export function clearHistory(): void {
     chatHistory.length = 0;
+    if (_flushTimer) clearTimeout(_flushTimer);
+    const filePath = historyPath();
+    if (filePath && existsSync(filePath)) {
+        try { unlinkSync(filePath); } catch { /* ignore */ }
+    }
 }
 
 /**

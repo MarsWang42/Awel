@@ -1,59 +1,34 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useImperativeHandle, forwardRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ChevronsUpDown, ChevronDown, Lock, X, Copy, Check } from 'lucide-react'
+import { Tooltip } from './ui/tooltip'
 
-interface ModelDefinition {
+interface ModelEntry {
     id: string
     label: string
-    provider: string
-    available: boolean
-    unavailableReason?: string
 }
 
-interface ProviderAvailability {
-    provider: string
+interface ProviderEntry {
+    id: string
     label: string
-    available: boolean
+    color: string
     envVar: string | null
+    available: boolean
+    unavailableReason?: string
+    customModelInput?: boolean
+    models: ModelEntry[]
+}
+
+export interface ModelSelectorHandle {
+    open: () => void
 }
 
 interface ModelSelectorProps {
     selectedModel: string
     selectedModelProvider: string
     onModelChange: (modelId: string, modelProvider: string) => void
+    onReady?: (hasValidSelection: boolean) => void
     chatHasMessages?: boolean
-}
-
-const PROVIDER_COLORS: Record<string, string> = {
-    'claude-code': 'text-orange-600 dark:text-orange-400',
-    anthropic: 'text-orange-600 dark:text-orange-400',
-    openai: 'text-green-600 dark:text-green-400',
-    'google-ai': 'text-blue-600 dark:text-blue-400',
-    'vercel-gateway': 'text-purple-600 dark:text-purple-400',
-    minimax: 'text-pink-600 dark:text-pink-400',
-    zhipu: 'text-cyan-600 dark:text-cyan-400',
-    openrouter: 'text-teal-600 dark:text-teal-400',
-}
-
-const PROVIDER_LABELS: Record<string, string> = {
-    'claude-code': 'Claude Code',
-    anthropic: 'Anthropic',
-    openai: 'OpenAI',
-    'google-ai': 'Google AI',
-    'vercel-gateway': 'Vercel AI Gateway',
-    minimax: 'MiniMax',
-    zhipu: 'Zhipu AI',
-    openrouter: 'OpenRouter',
-}
-
-const PROVIDER_ENV_KEYS: Record<string, string> = {
-    anthropic: 'ANTHROPIC_API_KEY',
-    openai: 'OPENAI_API_KEY',
-    'google-ai': 'GOOGLE_GENERATIVE_AI_API_KEY',
-    'vercel-gateway': 'AI_GATEWAY_API_KEY',
-    minimax: 'MINIMAX_API_KEY',
-    zhipu: 'ZHIPU_API_KEY',
-    openrouter: 'OPENROUTER_API_KEY',
 }
 
 const RECENT_CUSTOM_MODELS_KEY = 'awel-custom-models'
@@ -79,33 +54,13 @@ function saveRecentCustomModel(modelId: string): string[] {
 
 // ─── Instant Tooltip ─────────────────────────────────────────
 
-function Tooltip({ text, children, position = 'bottom' }: {
-    text: string
-    children: React.ReactNode
-    position?: 'bottom' | 'top'
-}) {
-    return (
-        <div className="relative group/tip">
-            {children}
-            <div className={`invisible group-hover/tip:visible opacity-0 group-hover/tip:opacity-100 transition-opacity duration-100
-                absolute z-[60] px-2 py-1 text-[10px] leading-tight text-muted-foreground bg-card border border-border rounded shadow-lg
-                whitespace-nowrap pointer-events-none
-                ${position === 'bottom' ? 'top-full mt-1.5 left-1/2 -translate-x-1/2' : 'bottom-full mb-1.5 left-1/2 -translate-x-1/2'}`}>
-                {text}
-            </div>
-        </div>
-    )
-}
 
 // ─── Env Key Row (click to copy) ─────────────────────────────
 
-function EnvKeyRow({ provider }: { provider: string }) {
+function EnvKeyRow({ envVar }: { envVar: string }) {
     const [copied, setCopied] = useState(false)
-    const envKey = PROVIDER_ENV_KEYS[provider]
 
-    if (!envKey) return null
-
-    const template = `export ${envKey}=your-key-here`
+    const template = `export ${envVar}=your-key-here`
 
     const handleCopy = async (e: React.MouseEvent) => {
         e.stopPropagation()
@@ -132,23 +87,42 @@ function EnvKeyRow({ provider }: { provider: string }) {
 
 // ─── Model Selector ──────────────────────────────────────────
 
-export function ModelSelector({ selectedModel, selectedModelProvider, onModelChange, chatHasMessages }: ModelSelectorProps) {
+export const ModelSelector = forwardRef<ModelSelectorHandle, ModelSelectorProps>(
+    function ModelSelector({ selectedModel, selectedModelProvider, onModelChange, onReady, chatHasMessages }, ref) {
     const { t } = useTranslation()
-    const [models, setModels] = useState<ModelDefinition[]>([])
-    const [providers, setProviders] = useState<ProviderAvailability[]>([])
+    const [providers, setProviders] = useState<ProviderEntry[]>([])
     const [isModalOpen, setIsModalOpen] = useState(false)
     const [providerFilter, setProviderFilter] = useState<string>('all')
     const [customModelInput, setCustomModelInput] = useState('')
     const [recentCustomModels, setRecentCustomModels] = useState<string[]>(loadRecentCustomModels)
 
-    // Determine if the current model uses the self-contained claude-code provider.
-    // Switching to/from claude-code mid-chat is not supported because its tool set
-    // is incompatible with messages produced by other providers.
-    const selectedDef = models.find(m => m.id === selectedModel)
+    useImperativeHandle(ref, () => ({
+        open: () => {
+            setProviderFilter('all')
+            setIsModalOpen(true)
+        },
+    }))
+
+    const handleModelChange = useCallback((modelId: string, modelProvider: string) => {
+        onModelChange(modelId, modelProvider)
+    }, [onModelChange])
+
+    // Find the selected model's definition by searching nested providers
+    const selectedDef = (() => {
+        for (const p of providers) {
+            const m = p.models.find(m => m.id === selectedModel && p.id === selectedModelProvider)
+            if (m) return { ...m, provider: p.id, color: p.color }
+        }
+        return null
+    })()
+
     const isClaudeCode = selectedDef?.provider === 'claude-code' || selectedModelProvider === 'claude-code'
     const disabled = chatHasMessages && isClaudeCode
 
-    const openRouterAvailable = providers.some(p => p.provider === 'openrouter' && p.available)
+    const availableProviders = providers.filter(p => p.available)
+    const unavailableProviders = providers.filter(p => !p.available)
+
+    const openRouterProvider = availableProviders.find(p => p.id === 'openrouter')
 
     useEffect(() => {
         async function fetchModels() {
@@ -156,21 +130,22 @@ export function ModelSelector({ selectedModel, selectedModelProvider, onModelCha
                 const res = await fetch('/api/models')
                 const data = await res.json()
                 if (data.providers && Array.isArray(data.providers)) {
-                    setProviders(data.providers)
-                }
-                if (data.models && Array.isArray(data.models)) {
-                    setModels(data.models)
-                    // If current selection is a custom OpenRouter model, don't override it
-                    const isCustomModel = selectedModelProvider === 'openrouter' && !data.models.find((m: ModelDefinition) => m.id === selectedModel)
-                    if (isCustomModel) return
-                    // If current selection isn't in the list or is unavailable, select first available
-                    const current = data.models.find((m: ModelDefinition) => m.id === selectedModel)
-                    if (data.models.length > 0 && (!current || !current.available)) {
-                        const firstAvailable = data.models.find((m: ModelDefinition) => m.available)
-                        if (firstAvailable) {
-                            onModelChange(firstAvailable.id, firstAvailable.provider)
-                        }
+                    const fetched: ProviderEntry[] = data.providers
+                    setProviders(fetched)
+
+                    // Check if current selection is valid
+                    const isCustomModel = selectedModelProvider === 'openrouter'
+                        && !fetched.flatMap(p => p.models).find(m => m.id === selectedModel)
+                    if (isCustomModel) {
+                        // Custom OpenRouter model — consider valid if provider is available
+                        const orProvider = fetched.find(p => p.id === 'openrouter')
+                        onReady?.(!!orProvider?.available)
+                        return
                     }
+
+                    const currentProvider = fetched.find(p => p.id === selectedModelProvider)
+                    const current = currentProvider?.available && currentProvider.models.find(m => m.id === selectedModel)
+                    onReady?.(!!current)
                 }
             } catch {
                 // API not available yet
@@ -195,50 +170,35 @@ export function ModelSelector({ selectedModel, selectedModelProvider, onModelCha
         if (!trimmed) return
         const updated = saveRecentCustomModel(trimmed)
         setRecentCustomModels(updated)
-        onModelChange(trimmed, 'openrouter')
+        handleModelChange(trimmed, 'openrouter')
         setCustomModelInput('')
         setIsModalOpen(false)
-    }, [customModelInput, onModelChange])
+    }, [customModelInput, handleModelChange])
 
-    // Split models into available and unavailable
-    const availableModels = models.filter(m => m.available)
-    const unavailableModels = models.filter(m => !m.available)
-
-    // Group available models by provider
-    const availableGrouped = availableModels.reduce<Record<string, ModelDefinition[]>>((acc, m) => {
-        if (!acc[m.provider]) acc[m.provider] = []
-        acc[m.provider].push(m)
-        return acc
-    }, {})
-
-    // Get unique unavailable providers from both models and providers list
-    const unavailableProviderKeys = new Set(unavailableModels.map(m => m.provider))
-    // Also add providers that are unavailable and not represented in availableGrouped
-    for (const p of providers) {
-        if (!p.available && !availableGrouped[p.provider]) {
-            unavailableProviderKeys.add(p.provider)
-        }
-    }
-    const unavailableProviders = [...unavailableProviderKeys]
+    // Available providers with models (for the main list)
+    const availableWithModels = availableProviders.filter(p => p.models.length > 0)
 
     // Available provider keys for the filter dropdown
-    const availableProviderKeys = [...Object.keys(availableGrouped)]
-    if (openRouterAvailable) {
-        availableProviderKeys.push('openrouter')
-    }
+    const availableProviderKeys = [
+        ...availableWithModels.map(p => p.id),
+        ...(openRouterProvider ? ['openrouter'] : []),
+    ]
+    // Deduplicate (openrouter may already be in availableWithModels if it gains catalog models)
+    const uniqueProviderKeys = [...new Set(availableProviderKeys)]
 
-    // Filtered groups based on provider filter
-    const filteredGroups = providerFilter === 'all'
-        ? availableGrouped
-        : { [providerFilter]: availableGrouped[providerFilter] || [] }
+    // Filtered providers based on provider filter
+    const filteredProviders = providerFilter === 'all'
+        ? availableWithModels
+        : availableWithModels.filter(p => p.id === providerFilter)
 
     // Show custom model section when openrouter is available and filter allows it
-    const showCustomModelSection = openRouterAvailable && (providerFilter === 'all' || providerFilter === 'openrouter')
+    const showCustomModelSection = !!openRouterProvider && (providerFilter === 'all' || providerFilter === 'openrouter')
 
-    if (models.length === 0 && providers.length === 0) return null
+    if (providers.length === 0) return null
 
     // Display for the trigger button
     const isCustomOpenRouterModel = !selectedDef && selectedModelProvider === 'openrouter'
+    const hasSelection = !!selectedDef || isCustomOpenRouterModel
 
     const selectorButton = (
         <button
@@ -256,16 +216,16 @@ export function ModelSelector({ selectedModel, selectedModelProvider, onModelCha
             }`}
         >
             {selectedDef && (
-                <span className={`truncate ${disabled ? 'text-muted-foreground' : PROVIDER_COLORS[selectedDef.provider]}`}>
+                <span className={`truncate ${disabled ? 'text-muted-foreground' : selectedDef.color}`}>
                     {selectedDef.label}
                 </span>
             )}
             {isCustomOpenRouterModel && (
-                <span className={`truncate ${PROVIDER_COLORS['openrouter']}`}>
+                <span className={`truncate ${providers.find(p => p.id === 'openrouter')?.color ?? ''}`}>
                     {selectedModel}
                 </span>
             )}
-            {!selectedDef && !isCustomOpenRouterModel && <span>{t('selectModel')}</span>}
+            {!hasSelection && <span>{t('selectModel')}</span>}
             {!disabled && <ChevronsUpDown className="w-3 h-3 text-muted-foreground flex-shrink-0" />}
         </button>
     )
@@ -273,7 +233,7 @@ export function ModelSelector({ selectedModel, selectedModelProvider, onModelCha
     return (
         <div className="relative">
             {disabled
-                ? <Tooltip text={t('modelSwitchDisabled')}>{selectorButton}</Tooltip>
+                ? <Tooltip text={t('modelSwitchDisabled')} position="bottom">{selectorButton}</Tooltip>
                 : selectorButton
             }
 
@@ -303,11 +263,14 @@ export function ModelSelector({ selectedModel, selectedModelProvider, onModelCha
                                     className="w-full text-xs bg-muted border border-border rounded-md px-2.5 py-1.5 pr-7 text-foreground outline-none focus:border-ring transition-colors appearance-none"
                                 >
                                     <option value="all">{t('allProviders', 'All Providers')}</option>
-                                    {availableProviderKeys.map(key => (
-                                        <option key={key} value={key}>
-                                            {PROVIDER_LABELS[key] || key}
-                                        </option>
-                                    ))}
+                                    {uniqueProviderKeys.map(key => {
+                                        const p = providers.find(p => p.id === key)
+                                        return (
+                                            <option key={key} value={key}>
+                                                {p?.label ?? key}
+                                            </option>
+                                        )
+                                    })}
                                 </select>
                                 <ChevronDown className="w-3.5 h-3.5 text-muted-foreground absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
                             </div>
@@ -315,14 +278,14 @@ export function ModelSelector({ selectedModel, selectedModelProvider, onModelCha
 
                         {/* Model list */}
                         <div className="overflow-y-auto flex-1">
-                            {Object.entries(filteredGroups).map(([provider, providerModels]) => (
-                                <div key={provider}>
-                                    <div className={`px-4 py-1.5 text-[10px] font-medium uppercase tracking-wider bg-card/50 sticky top-0 ${PROVIDER_COLORS[provider] || 'text-muted-foreground'}`}>
-                                        {PROVIDER_LABELS[provider] || provider}
+                            {filteredProviders.map(provider => (
+                                <div key={provider.id}>
+                                    <div className={`px-4 py-1.5 text-[10px] font-medium uppercase tracking-wider bg-card/50 sticky top-0 ${provider.color || 'text-muted-foreground'}`}>
+                                        {provider.label}
                                     </div>
-                                    {providerModels.map(m => {
+                                    {provider.models.map(m => {
                                         // Block switching to claude-code models mid-chat from a non-claude-code model
-                                        const isLocked = chatHasMessages && !isClaudeCode && m.provider === 'claude-code'
+                                        const isLocked = chatHasMessages && !isClaudeCode && provider.id === 'claude-code'
 
                                         const button = (
                                             <button
@@ -330,22 +293,22 @@ export function ModelSelector({ selectedModel, selectedModelProvider, onModelCha
                                                 disabled={isLocked}
                                                 onClick={() => {
                                                     if (isLocked) return
-                                                    onModelChange(m.id, m.provider)
+                                                    handleModelChange(m.id, provider.id)
                                                     setIsModalOpen(false)
                                                 }}
                                                 className={`w-full text-left px-4 py-2 text-xs transition-colors ${
                                                     isLocked
                                                         ? 'text-muted-foreground cursor-not-allowed'
-                                                        : m.id === selectedModel
+                                                        : m.id === selectedModel && provider.id === selectedModelProvider
                                                             ? 'bg-muted text-foreground'
                                                             : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
                                                 }`}
                                             >
-                                                <span className={isLocked ? 'text-muted-foreground' : PROVIDER_COLORS[m.provider]}>{m.label}</span>
+                                                <span className={isLocked ? 'text-muted-foreground' : provider.color}>{m.label}</span>
                                                 {isLocked && (
                                                     <Lock className="w-3 h-3 text-muted-foreground inline ml-1.5" />
                                                 )}
-                                                {m.id === selectedModel && (
+                                                {m.id === selectedModel && provider.id === selectedModelProvider && (
                                                     <span className="ml-2 text-[10px] text-muted-foreground">&#10003;</span>
                                                 )}
                                             </button>
@@ -361,8 +324,8 @@ export function ModelSelector({ selectedModel, selectedModelProvider, onModelCha
                             {/* Custom OpenRouter model input */}
                             {showCustomModelSection && (
                                 <div>
-                                    <div className={`px-4 py-1.5 text-[10px] font-medium uppercase tracking-wider bg-card/50 sticky top-0 ${PROVIDER_COLORS['openrouter']}`}>
-                                        {PROVIDER_LABELS['openrouter']}
+                                    <div className={`px-4 py-1.5 text-[10px] font-medium uppercase tracking-wider bg-card/50 sticky top-0 ${openRouterProvider?.color ?? ''}`}>
+                                        {openRouterProvider?.label ?? 'OpenRouter'}
                                     </div>
                                     <div className="px-4 py-2.5 space-y-2">
                                         <div className="flex gap-2">
@@ -394,7 +357,7 @@ export function ModelSelector({ selectedModel, selectedModelProvider, onModelCha
                                                         onClick={() => {
                                                             const updated = saveRecentCustomModel(modelId)
                                                             setRecentCustomModels(updated)
-                                                            onModelChange(modelId, 'openrouter')
+                                                            handleModelChange(modelId, 'openrouter')
                                                             setIsModalOpen(false)
                                                         }}
                                                         className={`text-[10px] px-2 py-0.5 rounded-full border transition-colors ${
@@ -422,17 +385,17 @@ export function ModelSelector({ selectedModel, selectedModelProvider, onModelCha
                                     </div>
                                     {unavailableProviders.map(provider => (
                                         <div
-                                            key={provider}
+                                            key={provider.id}
                                             className="px-4 py-2 text-xs text-muted-foreground"
                                         >
                                             <div className="flex items-center gap-2">
                                                 <Lock className="w-3 h-3 text-muted-foreground" />
-                                                <span>{PROVIDER_LABELS[provider] || provider}</span>
+                                                <span>{provider.label}</span>
                                                 <span className="text-[10px] text-muted-foreground">
-                                                    {provider === 'claude-code' ? 'CLI not installed' : 'API key required'}
+                                                    {provider.id === 'claude-code' ? 'CLI not installed' : 'API key required'}
                                                 </span>
                                             </div>
-                                            <EnvKeyRow provider={provider} />
+                                            {provider.envVar && <EnvKeyRow envVar={provider.envVar} />}
                                         </div>
                                     ))}
                                 </>
@@ -443,4 +406,4 @@ export function ModelSelector({ selectedModel, selectedModelProvider, onModelCha
             )}
         </div>
     )
-}
+})
