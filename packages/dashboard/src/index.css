@@ -74,20 +74,20 @@
         --diff-remove-marker: 0 80% 60%;
         --diff-context-text: 0 0% 55%;
         /* Confirm card colors - dark mode */
-        --confirm-border: 220 50% 30%;
-        --confirm-bg: 220 40% 12%;
-        --confirm-header: 220 60% 70%;
-        --confirm-icon: 220 60% 65%;
-        --confirm-code-bg: 220 30% 18%;
-        --confirm-code-text: 220 40% 80%;
-        --confirm-btn-primary-bg: 220 60% 50%;
-        --confirm-btn-primary-hover: 220 60% 55%;
-        --confirm-btn-secondary-bg: 220 30% 22%;
-        --confirm-btn-secondary-text: 220 50% 75%;
-        --confirm-btn-secondary-hover: 220 30% 28%;
-        --confirm-btn-deny-bg: 0 0% 20%;
-        --confirm-btn-deny-text: 0 0% 65%;
-        --confirm-btn-deny-hover: 0 0% 25%;
+        --confirm-border: 220 50% 40%;
+        --confirm-bg: 220 35% 18%;
+        --confirm-header: 220 70% 78%;
+        --confirm-icon: 220 65% 72%;
+        --confirm-code-bg: 220 25% 24%;
+        --confirm-code-text: 220 50% 85%;
+        --confirm-btn-primary-bg: 220 65% 55%;
+        --confirm-btn-primary-hover: 220 65% 62%;
+        --confirm-btn-secondary-bg: 220 30% 28%;
+        --confirm-btn-secondary-text: 220 55% 82%;
+        --confirm-btn-secondary-hover: 220 30% 35%;
+        --confirm-btn-deny-bg: 0 0% 28%;
+        --confirm-btn-deny-text: 0 0% 75%;
+        --confirm-btn-deny-hover: 0 0% 35%;
     }
 }
 

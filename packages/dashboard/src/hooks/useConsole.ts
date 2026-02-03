@@ -453,7 +453,22 @@ export function useConsole(selectedModel: string, selectedModelProvider: string,
         setIsLoading(false)
         setWaitingForInput(false)
         setAborted(true)
-        setMessages(prev => prev.filter(m => m.type !== 'status'))
+        // Remove status messages and add an aborted message
+        setMessages(prev => [
+            ...prev.filter(m => m.type !== 'status'),
+            {
+                id: crypto.randomUUID(),
+                type: 'status',
+                timestamp: new Date(),
+                text: 'aborted',
+            } as ParsedMessage
+        ])
+        // Persist to history (use 'aborted' event type, not 'status' which is transient)
+        fetch('/api/chat/history', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ eventType: 'aborted', data: JSON.stringify({}) }),
+        }).catch(() => {})
     }, [])
 
     // ─── Submit ──────────────────────────────────────────────

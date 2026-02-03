@@ -89,5 +89,6 @@
     "confirmAllowAllHint": "Applies for the entire session until chat history is cleared.",
     "confirmDeny": "Deny",
     "confirmApproved": "Allowed",
-    "confirmRejected": "Denied"
+    "confirmRejected": "Denied",
+    "aborted": "Aborted"
 }

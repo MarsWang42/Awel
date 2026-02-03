@@ -168,6 +168,9 @@ export function parseSSEData(eventType: string, rawData: string): Partial<Parsed
             case 'error':
                 return { type: 'error', text: stringify(data.message || 'Unknown error') }
 
+            case 'aborted':
+                return { type: 'status', text: 'aborted' }
+
             default:
                 return null
         }

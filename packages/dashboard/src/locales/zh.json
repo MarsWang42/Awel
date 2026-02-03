@@ -89,5 +89,6 @@
     "confirmAllowAllHint": "在整个会话期间有效，直到清除聊天记录。",
     "confirmDeny": "拒绝",
     "confirmApproved": "已允许",
-    "confirmRejected": "已拒绝"
+    "confirmRejected": "已拒绝",
+    "aborted": "已中止"
 }
