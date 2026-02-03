@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useImperativeHandle, forwardRef } fro
 import { useTranslation } from 'react-i18next'
 import { ChevronsUpDown, ChevronDown, Lock, X, Copy, Check } from 'lucide-react'
 import { Tooltip } from './ui/tooltip'
+import { ConfirmDialog } from './ui/confirm-dialog'
 
 interface ModelEntry {
     id: string
@@ -27,6 +28,7 @@ interface ModelSelectorProps {
     selectedModel: string
     selectedModelProvider: string
     onModelChange: (modelId: string, modelProvider: string) => void
+    onClearHistory?: () => Promise<void>
     onReady?: (hasValidSelection: boolean) => void
     chatHasMessages?: boolean
 }
@@ -51,9 +53,6 @@ function saveRecentCustomModel(modelId: string): string[] {
     localStorage.setItem(RECENT_CUSTOM_MODELS_KEY, JSON.stringify(deduped))
     return deduped
 }
-
-// ─── Instant Tooltip ─────────────────────────────────────────
-
 
 // ─── Env Key Row (click to copy) ─────────────────────────────
 
@@ -88,13 +87,17 @@ function EnvKeyRow({ envVar }: { envVar: string }) {
 // ─── Model Selector ──────────────────────────────────────────
 
 export const ModelSelector = forwardRef<ModelSelectorHandle, ModelSelectorProps>(
-    function ModelSelector({ selectedModel, selectedModelProvider, onModelChange, onReady, chatHasMessages }, ref) {
+    function ModelSelector({ selectedModel, selectedModelProvider, onModelChange, onClearHistory, onReady, chatHasMessages }, ref) {
     const { t } = useTranslation()
     const [providers, setProviders] = useState<ProviderEntry[]>([])
     const [isModalOpen, setIsModalOpen] = useState(false)
     const [providerFilter, setProviderFilter] = useState<string>('all')
     const [customModelInput, setCustomModelInput] = useState('')
     const [recentCustomModels, setRecentCustomModels] = useState<string[]>(loadRecentCustomModels)
+    // For switching away from Claude Code (needs history clear)
+    const [pendingSwitch, setPendingSwitch] = useState<{ modelId: string; providerId: string } | null>(null)
+    // For selecting Claude Code (warning modal)
+    const [pendingClaudeCode, setPendingClaudeCode] = useState<{ modelId: string; providerId: string } | null>(null)
 
     useImperativeHandle(ref, () => ({
         open: () => {
@@ -103,9 +106,59 @@ export const ModelSelector = forwardRef<ModelSelectorHandle, ModelSelectorProps>
         },
     }))
 
-    const handleModelChange = useCallback((modelId: string, modelProvider: string) => {
-        onModelChange(modelId, modelProvider)
-    }, [onModelChange])
+    const isClaudeCode = selectedModelProvider === 'claude-code'
+
+    const handleModelSelect = useCallback((modelId: string, providerId: string) => {
+        const selectingClaudeCode = providerId === 'claude-code'
+        const switchingFromClaudeCode = !selectingClaudeCode && isClaudeCode && chatHasMessages
+
+        // Selecting Claude Code (and not already on it) → show warning
+        if (selectingClaudeCode && !isClaudeCode) {
+            setPendingClaudeCode({ modelId, providerId })
+            return
+        }
+
+        // Switching away from Claude Code with messages → show clear history warning
+        if (switchingFromClaudeCode) {
+            setPendingSwitch({ modelId, providerId })
+            return
+        }
+
+        // Otherwise, just switch
+        onModelChange(modelId, providerId)
+        setIsModalOpen(false)
+    }, [isClaudeCode, chatHasMessages, onModelChange])
+
+    // Confirm Claude Code warning
+    const handleConfirmClaudeCode = useCallback(async () => {
+        if (!pendingClaudeCode) return
+        // If switching from another model with messages, also clear history
+        if (chatHasMessages && onClearHistory) {
+            await onClearHistory()
+        }
+        onModelChange(pendingClaudeCode.modelId, pendingClaudeCode.providerId)
+        setPendingClaudeCode(null)
+        setIsModalOpen(false)
+    }, [pendingClaudeCode, chatHasMessages, onClearHistory, onModelChange])
+
+    const handleCancelClaudeCode = useCallback(() => {
+        setPendingClaudeCode(null)
+    }, [])
+
+    // Confirm switching away from Claude Code
+    const handleConfirmSwitch = useCallback(async () => {
+        if (!pendingSwitch) return
+        if (onClearHistory) {
+            await onClearHistory()
+        }
+        onModelChange(pendingSwitch.modelId, pendingSwitch.providerId)
+        setPendingSwitch(null)
+        setIsModalOpen(false)
+    }, [pendingSwitch, onClearHistory, onModelChange])
+
+    const handleCancelSwitch = useCallback(() => {
+        setPendingSwitch(null)
+    }, [])
 
     // Find the selected model's definition by searching nested providers
     const selectedDef = (() => {
@@ -116,8 +169,7 @@ export const ModelSelector = forwardRef<ModelSelectorHandle, ModelSelectorProps>
         return null
     })()
 
-    const isClaudeCode = selectedDef?.provider === 'claude-code' || selectedModelProvider === 'claude-code'
-    const disabled = chatHasMessages && isClaudeCode
+    const disabled = chatHasMessages && isClaudeCode && !onClearHistory
 
     const availableProviders = providers.filter(p => p.available)
     const unavailableProviders = providers.filter(p => !p.available)
@@ -170,10 +222,9 @@ export const ModelSelector = forwardRef<ModelSelectorHandle, ModelSelectorProps>
         if (!trimmed) return
         const updated = saveRecentCustomModel(trimmed)
         setRecentCustomModels(updated)
-        handleModelChange(trimmed, 'openrouter')
+        handleModelSelect(trimmed, 'openrouter')
         setCustomModelInput('')
-        setIsModalOpen(false)
-    }, [customModelInput, handleModelChange])
+    }, [customModelInput, handleModelSelect])
 
     // Available providers with models (for the main list)
     const availableWithModels = availableProviders.filter(p => p.models.length > 0)
@@ -283,41 +334,22 @@ export const ModelSelector = forwardRef<ModelSelectorHandle, ModelSelectorProps>
                                     <div className={`px-4 py-1.5 text-[10px] font-medium uppercase tracking-wider bg-card/50 sticky top-0 ${provider.color || 'text-muted-foreground'}`}>
                                         {provider.label}
                                     </div>
-                                    {provider.models.map(m => {
-                                        // Block switching to claude-code models mid-chat from a non-claude-code model
-                                        const isLocked = chatHasMessages && !isClaudeCode && provider.id === 'claude-code'
-
-                                        const button = (
-                                            <button
-                                                key={m.id}
-                                                disabled={isLocked}
-                                                onClick={() => {
-                                                    if (isLocked) return
-                                                    handleModelChange(m.id, provider.id)
-                                                    setIsModalOpen(false)
-                                                }}
-                                                className={`w-full text-left px-4 py-2 text-xs transition-colors ${
-                                                    isLocked
-                                                        ? 'text-muted-foreground cursor-not-allowed'
-                                                        : m.id === selectedModel && provider.id === selectedModelProvider
-                                                            ? 'bg-muted text-foreground'
-                                                            : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
-                                                }`}
-                                            >
-                                                <span className={isLocked ? 'text-muted-foreground' : provider.color}>{m.label}</span>
-                                                {isLocked && (
-                                                    <Lock className="w-3 h-3 text-muted-foreground inline ml-1.5" />
-                                                )}
-                                                {m.id === selectedModel && provider.id === selectedModelProvider && (
-                                                    <span className="ml-2 text-[10px] text-muted-foreground">&#10003;</span>
-                                                )}
-                                            </button>
-                                        )
-
-                                        return isLocked
-                                            ? <Tooltip key={m.id} text={t('modelSwitchDisabled')} position="top">{button}</Tooltip>
-                                            : button
-                                    })}
+                                    {provider.models.map(m => (
+                                        <button
+                                            key={m.id}
+                                            onClick={() => handleModelSelect(m.id, provider.id)}
+                                            className={`w-full text-left px-4 py-2 text-xs transition-colors ${
+                                                m.id === selectedModel && provider.id === selectedModelProvider
+                                                    ? 'bg-muted text-foreground'
+                                                    : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
+                                            }`}
+                                        >
+                                            <span className={provider.color}>{m.label}</span>
+                                            {m.id === selectedModel && provider.id === selectedModelProvider && (
+                                                <span className="ml-2 text-[10px] text-muted-foreground">&#10003;</span>
+                                            )}
+                                        </button>
+                                    ))}
                                 </div>
                             ))}
 
@@ -357,8 +389,7 @@ export const ModelSelector = forwardRef<ModelSelectorHandle, ModelSelectorProps>
                                                         onClick={() => {
                                                             const updated = saveRecentCustomModel(modelId)
                                                             setRecentCustomModels(updated)
-                                                            handleModelChange(modelId, 'openrouter')
-                                                            setIsModalOpen(false)
+                                                            handleModelSelect(modelId, 'openrouter')
                                                         }}
                                                         className={`text-[10px] px-2 py-0.5 rounded-full border transition-colors ${
                                                             modelId === selectedModel && selectedModelProvider === 'openrouter'
@@ -403,6 +434,29 @@ export const ModelSelector = forwardRef<ModelSelectorHandle, ModelSelectorProps>
                         </div>
                     </div>
                 </div>
+            )}
+
+            {/* Warning dialog when selecting Claude Code */}
+            {pendingClaudeCode && (
+                <ConfirmDialog
+                    title={t('claudeCodeWarningTitle')}
+                    description={chatHasMessages ? t('claudeCodeWarningWithClearDescription') : t('claudeCodeWarningDescription')}
+                    confirmLabel={t('continue')}
+                    variant="warning"
+                    onConfirm={handleConfirmClaudeCode}
+                    onCancel={handleCancelClaudeCode}
+                />
+            )}
+
+            {/* Confirmation dialog for switching away from Claude Code */}
+            {pendingSwitch && (
+                <ConfirmDialog
+                    title={t('claudeCodeSwitchTitle')}
+                    description={t('claudeCodeSwitchDescription')}
+                    variant="warning"
+                    onConfirm={handleConfirmSwitch}
+                    onCancel={handleCancelSwitch}
+                />
             )}
         </div>
     )

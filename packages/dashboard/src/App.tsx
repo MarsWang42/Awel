@@ -45,6 +45,11 @@ function App() {
         setChatKey(k => k + 1)
     }
 
+    const handleClearHistory = async () => {
+        await fetch('/api/chat/history', { method: 'DELETE' })
+        setChatKey(k => k + 1)
+    }
+
     const handleModelChange = (modelId: string, modelProvider: string) => {
         setSelectedModel(modelId)
         setSelectedModelProvider(modelProvider)
@@ -95,8 +100,8 @@ function App() {
         <div className="fixed inset-0" onClick={handleBackdropClick}>
             {/* Panel */}
             <div
-                className={`absolute top-6 right-6 bottom-20 bg-background rounded-xl shadow-2xl flex flex-col overflow-hidden border border-border ${
-                    expanded ? 'left-6' : 'w-[380px]'
+                className={`absolute top-6 right-6 bottom-20 bg-background rounded-xl shadow-2xl flex flex-col overflow-hidden border border-border transition-[width] duration-200 ease-out ${
+                    expanded ? 'w-[calc(100%-3rem)]' : 'w-[380px]'
                 }`}
                 onClick={e => e.stopPropagation()}
             >
@@ -115,6 +120,7 @@ function App() {
                             selectedModel={selectedModel}
                             selectedModelProvider={selectedModelProvider}
                             onModelChange={handleModelChange}
+                            onClearHistory={handleClearHistory}
                             onReady={handleModelReady}
                             chatHasMessages={chatHasMessages}
                         />

@@ -90,5 +90,11 @@
     "confirmDeny": "Deny",
     "confirmApproved": "Allowed",
     "confirmRejected": "Denied",
-    "aborted": "Aborted"
+    "aborted": "Aborted",
+    "claudeCodeWarningTitle": "Use with caution",
+    "claudeCodeWarningDescription": "Claude Code will automatically approve all file edits and shell commands without asking for your confirmation.",
+    "claudeCodeWarningWithClearDescription": "Claude Code will automatically approve all file edits and shell commands without asking for your confirmation. Your current chat history will also be deleted.",
+    "claudeCodeSwitchTitle": "Switch model?",
+    "claudeCodeSwitchDescription": "Switching between Claude Code and other models requires clearing chat history. Your current conversation will be deleted.",
+    "continue": "Continue"
 }

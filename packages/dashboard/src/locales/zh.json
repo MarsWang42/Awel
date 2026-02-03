@@ -90,5 +90,11 @@
     "confirmDeny": "拒绝",
     "confirmApproved": "已允许",
     "confirmRejected": "已拒绝",
-    "aborted": "已中止"
+    "aborted": "已中止",
+    "claudeCodeWarningTitle": "请谨慎使用",
+    "claudeCodeWarningDescription": "Claude Code 将自动批准所有文件编辑和命令执行，不会请求您的确认。",
+    "claudeCodeWarningWithClearDescription": "Claude Code 将自动批准所有文件编辑和命令执行，不会请求您的确认。当前聊天记录也将被删除。",
+    "claudeCodeSwitchTitle": "切换模型？",
+    "claudeCodeSwitchDescription": "在 Claude Code 与其他模型之间切换需要清除聊天记录，当前对话将被删除。",
+    "continue": "继续"
 }
