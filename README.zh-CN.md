@@ -68,11 +68,14 @@ Awel 使用 [Vercel AI SDK](https://sdk.vercel.ai)，支持多个服务商。设
 | Anthropic API | `ANTHROPIC_API_KEY` | claude-sonnet-4-5, claude-opus-4-5 |
 | OpenAI | `OPENAI_API_KEY` | gpt-5.2-codex, gpt-5.1-codex |
 | Google AI | `GOOGLE_GENERATIVE_AI_API_KEY` | gemini-3-pro-preview, gemini-2.5-pro |
-| 通义千问 | `DASHSCOPE_API_KEY` | qwen-max, qwen-plus-latest |
 | MiniMax | `MINIMAX_API_KEY` | MiniMax-M2 |
+| 智谱 AI | `ZHIPU_API_KEY` | glm-4-plus, glm-4-flash |
 | Vercel Gateway | `AI_GATEWAY_API_KEY` | 通过网关访问多种模型 |
+| OpenRouter | `OPENROUTER_API_KEY` | 通过 OpenRouter 访问任意模型 |
 
 可随时在面板顶部的下拉菜单中切换模型。
+
+> **注意：** Claude Code 模型使用"YOLO 模式"——会自动批准所有文件编辑和命令执行，不会请求确认。选择这些模型时会显示警告提示。
 
 ### 额外环境变量
 
@@ -85,14 +88,15 @@ Awel 使用 [Vercel AI SDK](https://sdk.vercel.ai)，支持多个服务商。设
 
 AI 智能体可使用以下工具：
 
-- **Read** / **Write** / **Edit** / **MultiEdit** — 文件操作
-- **Bash** — 执行 Shell 命令
-- **Glob** / **Grep** / **CodeSearch** — 查找文件和搜索代码
+- **Read** / **Write** / **Edit** / **MultiEdit** — 文件操作（支持用户确认）
+- **Bash** — 执行 Shell 命令（支持用户确认）
+- **Glob** / **Grep** / **Ls** / **CodeSearch** — 查找文件和搜索代码
 - **WebSearch** / **WebFetch** — 网络搜索
 - **ProposePlan** — 提出多步骤实施计划，等待你审批后再执行
 - **AskUser** — 在执行过程中向你提问
 - **RestartDevServer** — 配置变更后重启开发服务器
 - **TodoRead** / **TodoWrite** — 跨对话的任务管理
+- **Memory** — 存储和检索持久化的项目知识
 
 ## 功能特性
 
@@ -106,8 +110,10 @@ AI 智能体可使用以下工具：
 
 - **图片附件** — 附加截图或参考图片
 - **计划审批** — 智能体可以提出计划，由你审核后再执行变更
+- **工具确认** — 在文件编辑和命令执行前进行确认（非 Claude Code 模型）
 - **撤销** — 一键回滚整个智能体会话的所有文件变更
 - **Diff 审查** — 在接受变更前查看所有文件修改的摘要
+- **记忆** — 智能体可以跨会话保存和调用项目相关知识
 - **深色模式** — 跟随系统偏好
 - **国际化** — 支持英文和中文
 - **创建模式** — `awel create` 创建新项目并启动全屏 AI 对话界面，描述你的应用，智能体从零开始为你构建
@@ -117,6 +123,8 @@ AI 智能体可使用以下工具：
 ```bash
 npm run build           # 构建所有模块
 npm run dev             # 监听模式（仅 CLI）
+npm run test            # 运行测试
+npm run test:watch      # 测试监听模式
 ```
 
 单独构建：

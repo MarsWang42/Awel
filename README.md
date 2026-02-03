@@ -68,11 +68,14 @@ Awel uses the [Vercel AI SDK](https://sdk.vercel.ai) and supports multiple provi
 | Anthropic API | `ANTHROPIC_API_KEY` | claude-sonnet-4-5, claude-opus-4-5 |
 | OpenAI | `OPENAI_API_KEY` | gpt-5.2-codex, gpt-5.1-codex |
 | Google AI | `GOOGLE_GENERATIVE_AI_API_KEY` | gemini-3-pro-preview, gemini-2.5-pro |
-| Qwen | `DASHSCOPE_API_KEY` | qwen-max, qwen-plus-latest |
 | MiniMax | `MINIMAX_API_KEY` | MiniMax-M2 |
+| Zhipu AI | `ZHIPU_API_KEY` | glm-4-plus, glm-4-flash |
 | Vercel Gateway | `AI_GATEWAY_API_KEY` | Various models via gateway |
+| OpenRouter | `OPENROUTER_API_KEY` | Any model via OpenRouter |
 
 Switch models at any time from the dropdown in the dashboard header.
+
+> **Note:** Claude Code models use "YOLO mode" — they automatically approve all file edits and shell commands without asking for confirmation. A warning is shown when selecting these models.
 
 ### Additional Environment Variables
 
@@ -85,14 +88,15 @@ Switch models at any time from the dropdown in the dashboard header.
 
 The AI agent has access to:
 
-- **Read** / **Write** / **Edit** / **MultiEdit** — file operations
-- **Bash** — run shell commands
-- **Glob** / **Grep** / **CodeSearch** — find files and search code
+- **Read** / **Write** / **Edit** / **MultiEdit** — file operations (with optional user confirmation)
+- **Bash** — run shell commands (with optional user confirmation)
+- **Glob** / **Grep** / **Ls** / **CodeSearch** — find files and search code
 - **WebSearch** / **WebFetch** — look things up on the web
 - **ProposePlan** — propose a multi-step plan for your approval before executing
 - **AskUser** — ask you clarifying questions mid-stream
 - **RestartDevServer** — restart your dev server after config changes
 - **TodoRead** / **TodoWrite** — track tasks across the conversation
+- **Memory** — store and retrieve persistent project knowledge
 
 ## Features
 
@@ -106,8 +110,10 @@ The AI agent has access to:
 
 - **Image attachments** — attach screenshots or reference images
 - **Plan approval** — the agent can propose plans for you to review before making changes
+- **Tool confirmation** — approve or deny file edits and shell commands before they execute (non-Claude Code models)
 - **Undo** — roll back all file changes from an agent session in one click
 - **Diff review** — review a summary of all file changes before accepting
+- **Memory** — the agent can save and recall project-specific knowledge across sessions
 - **Dark mode** — follows your system preference
 - **i18n** — English and Chinese
 - **Creation mode** — `awel create` scaffolds a new project and launches a full-page AI chat where you describe your app and the agent builds it from scratch
@@ -117,6 +123,8 @@ The AI agent has access to:
 ```bash
 npm run build           # Build everything
 npm run dev             # Watch mode (CLI only)
+npm run test            # Run tests
+npm run test:watch      # Watch mode for tests
 ```
 
 Individual builds:
