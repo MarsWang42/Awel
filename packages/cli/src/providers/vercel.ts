@@ -9,6 +9,7 @@ import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import { pauseDevServer, resumeDevServer } from '../devserver.js';
 import { addToHistory, writeSSEEvent } from '../sse.js';
 import { awelTools } from '../tools/index.js';
+import { rejectAllPending } from '../confirm-store.js';
 import { storePlan } from '../plan-store.js';
 import { startUndoSession, endUndoSession, getCurrentSessionStats } from '../undo.js';
 import { logEvent } from '../verbose.js';
@@ -234,7 +235,19 @@ export function createVercelProvider(modelId: string, providerType: ProviderType
             // loop via the `cwd` config — they don't need Awel's tools or system prompt.
             const isSelfContained = providerType === 'claude-code';
             const model = createModel(modelId, providerType, config.projectCwd);
-            const tools = isSelfContained ? undefined : awelTools(config.projectCwd);
+
+            // emitSSE helper used by tools that need to send events (e.g. confirmations)
+            const emitSSE = (event: string, data: string) => {
+                addToHistory(event, data);
+                stream.writeSSE({ event, data }).catch(() => {});
+            };
+
+            const tools = isSelfContained ? undefined : awelTools({
+                cwd: config.projectCwd,
+                emitSSE,
+                confirmBash: true,
+                confirmFileWrites: true,
+            });
 
             pauseDevServer(config.targetPort);
             const startTime = Date.now();
@@ -252,9 +265,13 @@ export function createVercelProvider(modelId: string, providerType: ProviderType
             // Propagate external cancellation (e.g. new chat request) to the internal controller
             if (config.signal) {
                 if (config.signal.aborted) {
+                    rejectAllPending();
                     abortController.abort();
                 } else {
-                    config.signal.addEventListener('abort', () => abortController.abort(), { once: true });
+                    config.signal.addEventListener('abort', () => {
+                        rejectAllPending();
+                        abortController.abort();
+                    }, { once: true });
                 }
             }
 
@@ -610,6 +627,8 @@ export function createVercelProvider(modelId: string, providerType: ProviderType
                     await stream.writeSSE({ event: 'result', data: resultData });
                 }
             } finally {
+                // Reject any pending confirmations so tool promises don't hang
+                rejectAllPending();
                 // End undo session so all file changes are grouped together
                 endUndoSession();
                 resumeDevServer(config.targetPort);

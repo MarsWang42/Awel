@@ -145,6 +145,23 @@ export function parseSSEData(eventType: string, rawData: string): Partial<Parsed
                     questions: data.questions,
                 }
 
+            case 'confirm':
+                return {
+                    type: 'confirm',
+                    confirmId: data.confirmId,
+                    confirmToolName: data.toolName,
+                    confirmSummary: data.summary,
+                    confirmDetails: data.details,
+                }
+
+            case 'confirm_resolved':
+                return {
+                    type: 'confirm',
+                    confirmId: data.confirmId,
+                    confirmResolved: true,
+                    confirmApproved: data.approved,
+                }
+
             case 'done':
                 return { type: 'done', text: data.message }
 

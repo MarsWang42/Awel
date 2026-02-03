@@ -12,6 +12,7 @@ import {
     ResultMessage,
     PlanMessage,
     QuestionMessage,
+    ConfirmMessage,
 } from '../components/chat'
 import { ToolGroup } from '../components/chat/ToolGroup'
 import type { ParsedMessage, SelectedElement, ConsoleEntry, ContentSegment, PageContext } from '../types/messages'
@@ -74,6 +75,9 @@ export function useConsole(selectedModel: string, selectedModelProvider: string,
                     let lastToolName: string | undefined
 
                     for (const item of data.history) {
+                        // Skip metadata-only events — they're handled in the second pass below
+                        if (item.eventType === 'confirm_resolved' || item.eventType === 'question_answered' || item.eventType === 'plan_approved') continue
+
                         const parsed = parseSSEData(item.eventType, item.data)
                         if (parsed) {
                             // Track tool name for result pairing
@@ -105,6 +109,39 @@ export function useConsole(selectedModel: string, selectedModelProvider: string,
                     for (const msg of parsedMessages) {
                         if (msg.type === 'question' && msg.questionId && answeredIds.has(msg.questionId)) {
                             msg.answered = true
+                        }
+                    }
+
+                    // Resolve confirm messages from persisted confirm_resolved events
+                    const resolvedConfirms = new Map<string, boolean>()
+                    for (const item of data.history) {
+                        if (item.eventType === 'confirm_resolved') {
+                            try {
+                                const d = JSON.parse(item.data)
+                                if (d.confirmId) resolvedConfirms.set(d.confirmId, d.approved)
+                            } catch {}
+                        }
+                    }
+                    for (const msg of parsedMessages) {
+                        if (msg.type === 'confirm' && msg.confirmId && resolvedConfirms.has(msg.confirmId)) {
+                            msg.confirmResolved = true
+                            msg.confirmApproved = resolvedConfirms.get(msg.confirmId)
+                        }
+                    }
+
+                    // Resolve plan messages from persisted plan_approved events
+                    const approvedPlanIds = new Set<string>()
+                    for (const item of data.history) {
+                        if (item.eventType === 'plan_approved') {
+                            try {
+                                const d = JSON.parse(item.data)
+                                if (d.planId) approvedPlanIds.add(d.planId)
+                            } catch {}
+                        }
+                    }
+                    for (const msg of parsedMessages) {
+                        if (msg.type === 'plan' && msg.planId && approvedPlanIds.has(msg.planId)) {
+                            msg.planApproved = true
                         }
                     }
 
@@ -250,7 +287,17 @@ export function useConsole(selectedModel: string, selectedModelProvider: string,
                     setWaitingForInput(true)
                 }
 
-                const shouldClearStatus = parsed.type && ['text', 'tool_use', 'tool_result', 'result', 'plan', 'question'].includes(parsed.type)
+                // confirm_resolved updates an existing confirm message in-place
+                if (parsed.type === 'confirm' && parsed.confirmResolved && parsed.confirmId) {
+                    setMessages(prev => prev.map(m =>
+                        m.type === 'confirm' && m.confirmId === parsed.confirmId
+                            ? { ...m, confirmResolved: true, confirmApproved: parsed.confirmApproved }
+                            : m
+                    ))
+                    return
+                }
+
+                const shouldClearStatus = parsed.type && ['text', 'tool_use', 'tool_result', 'result', 'plan', 'question', 'confirm'].includes(parsed.type)
 
                 setMessages(prev => {
                     const base = shouldClearStatus ? prev.filter(m => m.type !== 'status') : prev
@@ -290,7 +337,7 @@ export function useConsole(selectedModel: string, selectedModelProvider: string,
 
     // ─── Stream Helper ──────────────────────────────────────
 
-    const SSE_EVENT_TYPES = ['text', 'tool_use', 'tool_result', 'status', 'plan', 'question', 'result', 'message'] as const
+    const SSE_EVENT_TYPES = ['text', 'tool_use', 'tool_result', 'status', 'plan', 'question', 'confirm', 'confirm_resolved', 'result', 'message'] as const
 
     const connectEventSource = useCallback((url: string) => {
         eventSourceRef.current?.close()
@@ -444,8 +491,29 @@ export function useConsole(selectedModel: string, selectedModelProvider: string,
 
     // ─── Plan Handlers ───────────────────────────────────────
 
-    const handlePlanApprove = useCallback(async (_planId: string) => {
-        await fetch('/api/plan/approve', { method: 'POST' })
+    const handlePlanApprove = useCallback(async (planId: string, autoApprove?: boolean) => {
+        // Mark plan as approved in state
+        setMessages(prev => prev.map(m =>
+            m.type === 'plan' && m.planId === planId
+                ? { ...m, planApproved: true }
+                : m
+        ))
+
+        // Persist approved state for history reload
+        fetch('/api/chat/history', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                eventType: 'plan_approved',
+                data: JSON.stringify({ planId }),
+            }),
+        }).catch(() => {})
+
+        await fetch('/api/plan/approve', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ autoApprove: autoApprove || false }),
+        })
         const res = await fetch('/api/plan/active')
         const data = await res.json()
         const plan = data.plan
@@ -508,6 +576,28 @@ export function useConsole(selectedModel: string, selectedModelProvider: string,
 
         startStream(answerPrompt)
     }, [startStream])
+
+    // ─── Confirm Handler ─────────────────────────────────────
+
+    const handleConfirmResponse = useCallback((confirmId: string, approved: boolean, opts?: { allowAll?: boolean; category?: string }) => {
+        // Optimistically update the message state
+        setMessages(prev => prev.map(m =>
+            m.type === 'confirm' && m.confirmId === confirmId
+                ? { ...m, confirmResolved: true, confirmApproved: approved }
+                : m
+        ))
+
+        fetch('/api/confirm', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                confirmId,
+                approved,
+                allowAll: opts?.allowAll || false,
+                category: opts?.category,
+            }),
+        }).catch(() => {})
+    }, [])
 
     const handleUndone = useCallback((msgId: string) => {
         setMessages(prev => prev.map(m =>
@@ -604,6 +694,7 @@ export function useConsole(selectedModel: string, selectedModelProvider: string,
                         onApprove: handlePlanApprove,
                         onComment: handlePlanComment,
                         disabled: aborted,
+                        approved: msg.planApproved,
                     })
                     break
                 case 'question':
@@ -614,6 +705,19 @@ export function useConsole(selectedModel: string, selectedModelProvider: string,
                         onAnswer: handleQuestionAnswer,
                         disabled: aborted,
                         answered: msg.answered,
+                    }) : null
+                    break
+                case 'confirm':
+                    element = msg.confirmId ? createElement(ConfirmMessage, {
+                        key: msg.id,
+                        confirmId: msg.confirmId,
+                        toolName: msg.confirmToolName || 'Tool',
+                        summary: msg.confirmSummary || '',
+                        details: msg.confirmDetails,
+                        resolved: msg.confirmResolved,
+                        approved: msg.confirmApproved,
+                        onConfirm: handleConfirmResponse,
+                        disabled: aborted,
                     }) : null
                     break
                 case 'result':
@@ -649,7 +753,7 @@ export function useConsole(selectedModel: string, selectedModelProvider: string,
         }
 
         return elements
-    }, [messages, handlePlanApprove, handlePlanComment, handleQuestionAnswer, reattachConsoleEntry, onReviewDiffs, aborted])
+    }, [messages, handlePlanApprove, handlePlanComment, handleQuestionAnswer, handleConfirmResponse, reattachConsoleEntry, onReviewDiffs, aborted])
 
     return {
         messages,

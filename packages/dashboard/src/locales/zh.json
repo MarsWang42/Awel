@@ -44,6 +44,9 @@
     "feedbackPlaceholder": "输入您的调整意见或反馈...",
     "send": "发送指令",
     "proceedWithPlan": "批准并执行方案",
+    "proceedManual": "执行（逐项审批）",
+    "proceedApproveAll": "执行并全部批准",
+    "proceedApproveAllHint": "文件写入将在整个会话期间自动批准，直到清除聊天记录。",
     "questionsAnswered": "需求确认完毕",
     "auraHasQuestions": "Awel 需要与您进一步确认细节",
     "selectAllThatApply": "请勾选所有适用项",
@@ -77,5 +80,14 @@
     "allProviders": "所有提供商",
     "chooseModelFirst": "请先选择一个模型。",
     "chooseModelHeading": "选择模型",
-    "noModelsAvailable": "暂无可用模型，请先配置提供商。"
+    "noModelsAvailable": "暂无可用模型，请先配置提供商。",
+    "confirmBashHeader": "允许执行命令？",
+    "confirmWriteHeader": "允许写入文件？",
+    "confirmEditHeader": "允许编辑文件？",
+    "confirmAllow": "允许",
+    "confirmAllowAll": "全部允许",
+    "confirmAllowAllHint": "在整个会话期间有效，直到清除聊天记录。",
+    "confirmDeny": "拒绝",
+    "confirmApproved": "已允许",
+    "confirmRejected": "已拒绝"
 }

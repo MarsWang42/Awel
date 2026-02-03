@@ -6,6 +6,8 @@ import { addToHistory, getHistory, clearHistory } from './sse.js';
 import { getProviderCatalog } from './providers/registry.js';
 import { getOrCreateSession, getSessionMessages, appendUserMessage, appendResponseMessages, resetSession } from './session.js';
 import { getActivePlan, approvePlan } from './plan-store.js';
+import { resolveConfirmation, setAutoApprove, resetAutoApprove } from './confirm-store.js';
+import type { AutoApproveCategory } from './confirm-store.js';
 import { restartDevServer, getDevServerStatus } from './subprocess.js';
 import { readMemories, deleteMemory } from './memory.js';
 import type { Context } from 'hono';
@@ -289,6 +291,7 @@ export function createAgentRoute(projectCwd: string, targetPort: number, isFresh
     agent.delete('/api/chat/history', (c) => {
         clearHistory();
         resetSession();
+        resetAutoApprove();
         return c.json({ success: true });
     });
 
@@ -299,7 +302,17 @@ export function createAgentRoute(projectCwd: string, targetPort: number, isFresh
         return c.json({ plan });
     });
 
-    agent.post('/api/plan/approve', (c) => {
+    agent.post('/api/plan/approve', async (c) => {
+        let autoApprove = false;
+        try {
+            const body = await c.req.json();
+            autoApprove = body?.autoApprove === true;
+        } catch {
+            // No body or invalid JSON — default to manual approval
+        }
+        if (autoApprove) {
+            setAutoApprove('fileWrites', true);
+        }
         const success = approvePlan();
         return c.json({ success });
     });
@@ -314,6 +327,29 @@ export function createAgentRoute(projectCwd: string, targetPort: number, isFresh
         } catch {
             return c.json({ success: false, error: 'Invalid JSON' }, 400);
         }
+    });
+
+    // ─── Tool Confirmation ────────────────────────────────────
+
+    agent.post('/api/confirm', async (c) => {
+        let body: unknown;
+        try {
+            body = await c.req.json();
+        } catch {
+            return c.json({ success: false, error: 'Invalid JSON' }, 400);
+        }
+        const { confirmId, approved, allowAll, category } = body as {
+            confirmId?: string; approved?: boolean; allowAll?: boolean;
+            category?: AutoApproveCategory;
+        };
+        if (!confirmId || typeof approved !== 'boolean') {
+            return c.json({ success: false, error: 'Missing confirmId or approved' }, 400);
+        }
+        if (approved && allowAll && category) {
+            setAutoApprove(category, true);
+        }
+        const resolved = resolveConfirmation(confirmId, approved);
+        return c.json({ success: resolved });
     });
 
     // ─── Dev Server Management ──────────────────────────────

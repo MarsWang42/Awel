@@ -1,4 +1,4 @@
-export type MessageType = 'text' | 'tool_use' | 'tool_result' | 'error' | 'status' | 'stream' | 'done' | 'system' | 'user' | 'compact_boundary' | 'result' | 'plan' | 'question'
+export type MessageType = 'text' | 'tool_use' | 'tool_result' | 'error' | 'status' | 'stream' | 'done' | 'system' | 'user' | 'compact_boundary' | 'result' | 'plan' | 'question' | 'confirm'
 
 export type ResultSubtype = 'success' | 'waiting_for_input' | 'error_max_turns' | 'error_during_execution' | 'error_max_budget_usd' | 'error_max_structured_output_retries'
 
@@ -40,6 +40,7 @@ export interface ParsedMessage {
     planId?: string
     planTitle?: string
     planContent?: string
+    planApproved?: boolean
     // Question fields
     answered?: boolean
     questionId?: string
@@ -49,6 +50,13 @@ export interface ParsedMessage {
         multiSelect: boolean
         options: Array<{ label: string; description: string }>
     }>
+    // Confirm fields
+    confirmId?: string
+    confirmToolName?: string
+    confirmSummary?: string
+    confirmDetails?: string
+    confirmResolved?: boolean
+    confirmApproved?: boolean
 }
 
 export interface SelectedElement {

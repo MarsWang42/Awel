@@ -16,17 +16,25 @@ import { createTodoReadTool, createTodoWriteTool } from './todo.js';
 import { createRestartDevServerTool } from './restart-dev-server.js';
 import { createMemoryTool } from './memory.js';
 
+export interface ToolContext {
+    cwd: string;
+    emitSSE: (event: string, data: string) => void;
+    confirmBash: boolean;
+    confirmFileWrites: boolean;
+}
+
 /**
  * Returns all agentic tools configured for the given project directory.
  * Tool names use PascalCase to match Claude Code tool names for consistent SSE events.
  */
-export function awelTools(cwd: string) {
+export function awelTools(ctx: ToolContext) {
+    const { cwd } = ctx;
     return {
         Read: createReadTool(cwd),
-        Write: createWriteTool(cwd),
-        Edit: createEditTool(cwd),
-        MultiEdit: createMultiEditTool(cwd),
-        Bash: createBashTool(cwd),
+        Write: createWriteTool(ctx),
+        Edit: createEditTool(ctx),
+        MultiEdit: createMultiEditTool(ctx),
+        Bash: createBashTool(ctx),
         Glob: createGlobTool(cwd),
         Grep: createGrepTool(cwd),
         Ls: createLsTool(cwd),

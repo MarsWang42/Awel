@@ -2,8 +2,11 @@ import { tool } from 'ai';
 import { z } from 'zod';
 import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { resolve } from 'path';
+import { requestConfirmation, isAutoApproved } from '../confirm-store.js';
+import type { ToolContext } from './index.js';
 
-export function createMultiEditTool(cwd: string) {
+export function createMultiEditTool(ctx: ToolContext) {
+    const { cwd, emitSSE, confirmFileWrites } = ctx;
     return tool({
         description:
             'Perform multiple find-and-replace edits on a single file in one operation. ' +
@@ -18,6 +21,36 @@ export function createMultiEditTool(cwd: string) {
             })).min(1).describe('List of edits to apply sequentially'),
         }),
         execute: async ({ file_path, edits }) => {
+            if (confirmFileWrites && !isAutoApproved('fileWrites')) {
+                const confirmId = crypto.randomUUID();
+                const confirmData = JSON.stringify({
+                    type: 'confirm',
+                    confirmId,
+                    toolName: 'MultiEdit',
+                    summary: `${file_path} (${edits.length} edits)`,
+                    details: JSON.stringify(edits.map(e => ({ old_string: e.old_string, new_string: e.new_string }))),
+                });
+                emitSSE('confirm', confirmData);
+
+                const approved = await requestConfirmation(confirmId);
+                if (!approved) {
+                    const resolvedData = JSON.stringify({
+                        type: 'confirm_resolved',
+                        confirmId,
+                        approved: false,
+                    });
+                    emitSSE('confirm_resolved', resolvedData);
+                    return 'Error: MultiEdit was rejected by the user. Try a different approach or ask the user for guidance.';
+                }
+
+                const resolvedData = JSON.stringify({
+                    type: 'confirm_resolved',
+                    confirmId,
+                    approved: true,
+                });
+                emitSSE('confirm_resolved', resolvedData);
+            }
+
             const fullPath = file_path.startsWith('/') ? file_path : resolve(cwd, file_path);
 
             if (!existsSync(fullPath)) {

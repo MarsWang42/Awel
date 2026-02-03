@@ -7,15 +7,16 @@ interface PlanMessageProps {
     planId: string
     title: string
     content: string
-    onApprove: (planId: string) => void
+    onApprove: (planId: string, autoApprove?: boolean) => void
     onComment: (planId: string, comment: string) => void
     disabled?: boolean
+    approved?: boolean
 }
 
-export function PlanMessage({ planId, title, content, onApprove, onComment, disabled }: PlanMessageProps) {
+export function PlanMessage({ planId, title, content, onApprove, onComment, disabled, approved: initialApproved }: PlanMessageProps) {
     const { t } = useTranslation()
     const [modalOpen, setModalOpen] = useState(false)
-    const [approved, setApproved] = useState(false)
+    const [approved, setApproved] = useState(initialApproved ?? false)
     const [comment, setComment] = useState('')
 
     // Close modal on Escape
@@ -28,10 +29,10 @@ export function PlanMessage({ planId, title, content, onApprove, onComment, disa
         return () => window.removeEventListener('keydown', handleKey)
     }, [modalOpen])
 
-    const handleApprove = () => {
+    const handleApprove = (autoApprove?: boolean) => {
         setApproved(true)
         setModalOpen(false)
-        onApprove(planId)
+        onApprove(planId, autoApprove)
     }
 
     const handleSendComment = () => {
@@ -166,12 +167,23 @@ export function PlanMessage({ planId, title, content, onApprove, onComment, disa
                                         {t('send')}
                                     </button>
                                 </div>
-                                <button
-                                    onClick={handleApprove}
-                                    className="w-full text-xs font-medium px-4 py-2 rounded bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
-                                >
-                                    {t('proceedWithPlan')}
-                                </button>
+                                <div className="flex flex-col gap-1.5">
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={() => handleApprove(false)}
+                                            className="flex-1 text-xs font-medium px-4 py-2 rounded bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+                                        >
+                                            {t('proceedManual')}
+                                        </button>
+                                        <button
+                                            onClick={() => handleApprove(true)}
+                                            className="flex-1 text-xs font-medium px-4 py-2 rounded bg-primary/80 text-primary-foreground hover:bg-primary/70 transition-colors"
+                                        >
+                                            {t('proceedApproveAll')}
+                                        </button>
+                                    </div>
+                                    <p className="text-[10px] text-muted-foreground text-center">{t('proceedApproveAllHint')}</p>
+                                </div>
                             </div>
                         )}
                     </div>

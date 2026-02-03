@@ -44,6 +44,9 @@
     "feedbackPlaceholder": "Leave feedback to revise...",
     "send": "Send",
     "proceedWithPlan": "Proceed with Plan",
+    "proceedManual": "Proceed (review each)",
+    "proceedApproveAll": "Proceed & approve all",
+    "proceedApproveAllHint": "File writes will be auto-approved for this session until chat history is cleared.",
     "questionsAnswered": "Questions answered",
     "auraHasQuestions": "Awel has questions",
     "selectAllThatApply": "Select all that apply",
@@ -77,5 +80,14 @@
     "allProviders": "All Providers",
     "chooseModelFirst": "Choose a model to get started.",
     "chooseModelHeading": "Select a model",
-    "noModelsAvailable": "No models available. Configure a provider to continue."
+    "noModelsAvailable": "No models available. Configure a provider to continue.",
+    "confirmBashHeader": "Allow shell command?",
+    "confirmWriteHeader": "Allow file write?",
+    "confirmEditHeader": "Allow file edit?",
+    "confirmAllow": "Allow",
+    "confirmAllowAll": "Allow all",
+    "confirmAllowAllHint": "Applies for the entire session until chat history is cleared.",
+    "confirmDeny": "Deny",
+    "confirmApproved": "Allowed",
+    "confirmRejected": "Denied"
 }

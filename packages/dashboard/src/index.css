@@ -22,6 +22,29 @@
         --radius: 0.5rem;
         --scrollbar-thumb: rgba(0, 0, 0, 0.15);
         --scrollbar-thumb-hover: rgba(0, 0, 0, 0.25);
+        /* Diff colors - light mode */
+        --diff-add-bg: 146 76% 92%;
+        --diff-add-text: 142 70% 28%;
+        --diff-add-marker: 142 70% 38%;
+        --diff-remove-bg: 0 84% 94%;
+        --diff-remove-text: 0 72% 38%;
+        --diff-remove-marker: 0 72% 48%;
+        --diff-context-text: 0 0% 40%;
+        /* Confirm card colors - light mode */
+        --confirm-border: 220 70% 75%;
+        --confirm-bg: 220 60% 97%;
+        --confirm-header: 220 70% 45%;
+        --confirm-icon: 220 70% 50%;
+        --confirm-code-bg: 220 30% 94%;
+        --confirm-code-text: 220 50% 30%;
+        --confirm-btn-primary-bg: 220 70% 50%;
+        --confirm-btn-primary-hover: 220 70% 45%;
+        --confirm-btn-secondary-bg: 220 40% 92%;
+        --confirm-btn-secondary-text: 220 50% 35%;
+        --confirm-btn-secondary-hover: 220 40% 88%;
+        --confirm-btn-deny-bg: 0 0% 92%;
+        --confirm-btn-deny-text: 0 0% 40%;
+        --confirm-btn-deny-hover: 0 0% 88%;
     }
 
     .dark {
@@ -42,6 +65,29 @@
         --ring: 0 0% 80%;
         --scrollbar-thumb: rgba(255, 255, 255, 0.15);
         --scrollbar-thumb-hover: rgba(255, 255, 255, 0.25);
+        /* Diff colors - dark mode */
+        --diff-add-bg: 145 40% 14%;
+        --diff-add-text: 142 60% 70%;
+        --diff-add-marker: 142 60% 55%;
+        --diff-remove-bg: 0 50% 16%;
+        --diff-remove-text: 0 80% 75%;
+        --diff-remove-marker: 0 80% 60%;
+        --diff-context-text: 0 0% 55%;
+        /* Confirm card colors - dark mode */
+        --confirm-border: 220 50% 30%;
+        --confirm-bg: 220 40% 12%;
+        --confirm-header: 220 60% 70%;
+        --confirm-icon: 220 60% 65%;
+        --confirm-code-bg: 220 30% 18%;
+        --confirm-code-text: 220 40% 80%;
+        --confirm-btn-primary-bg: 220 60% 50%;
+        --confirm-btn-primary-hover: 220 60% 55%;
+        --confirm-btn-secondary-bg: 220 30% 22%;
+        --confirm-btn-secondary-text: 220 50% 75%;
+        --confirm-btn-secondary-hover: 220 30% 28%;
+        --confirm-btn-deny-bg: 0 0% 20%;
+        --confirm-btn-deny-text: 0 0% 65%;
+        --confirm-btn-deny-hover: 0 0% 25%;
     }
 }
 
