@@ -41,6 +41,7 @@ awel dev [options]       Start the development server with Awel overlay
 
   -p, --port <port>    Target app port (default: 3000)
   -v, --verbose        Print LLM stream events to stderr
+  --no-open            Do not open browser automatically
 ```
 
 ## How It Works

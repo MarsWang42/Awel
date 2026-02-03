@@ -1,8 +1,9 @@
 import { program } from 'commander';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve, join } from 'node:path';
+import open from 'open';
 import { startServer } from './server.js';
-import { AWEL_PORT, USER_APP_PORT } from './config.js';
+import { AWEL_PORT, USER_APP_PORT, findAvailablePort } from './config.js';
 import { setVerbose } from './verbose.js';
 import { ensureBabelPlugin } from './babel-setup.js';
 import { ensureProvider } from './onboarding.js';
@@ -47,9 +48,11 @@ program
     .description('Start the development server with Awel overlay')
     .option('-p, --port <port>', 'Port for target app', String(USER_APP_PORT))
     .option('-v, --verbose', 'Print all LLM stream events to stderr')
+    .option('--no-open', 'Do not open browser automatically')
     .action(async (options) => {
         const targetPort = parseInt(options.port, 10);
         if (options.verbose) setVerbose(true);
+        const shouldOpen = options.open !== false;
 
         const cwd = process.cwd();
         const framework = detectFramework(cwd);
@@ -73,25 +76,36 @@ program
         initHistory(cwd);
         initSession(cwd);
 
+        // Find an available port for Awel (bumps if default is occupied)
+        const awelPort = await findAvailablePort(AWEL_PORT);
+        if (awelPort !== AWEL_PORT) {
+            awel.log(`⚠️  Port ${AWEL_PORT} is in use, using ${awelPort} instead`);
+        }
+
         awel.log('🌟 Starting Awel...');
         if (fresh) awel.log('   Mode: Creation (new project)');
         awel.log(`   Target app port: ${targetPort}`);
-        awel.log(`   Awel control server: http://localhost:${AWEL_PORT}`);
+        awel.log(`   Awel control server: http://localhost:${awelPort}`);
         awel.log('');
 
         // Start the Awel control server (proxy + dashboard)
-        await startServer({ awelPort: AWEL_PORT, targetPort, projectCwd: cwd, fresh });
+        await startServer({ awelPort, targetPort, projectCwd: cwd, fresh });
 
         // Start the user's dev server via subprocess manager (handles auto-restart)
         await spawnDevServer({ port: targetPort, cwd: cwd });
 
         awel.log('');
+        const url = `http://localhost:${awelPort}`;
         if (fresh) {
-            awel.log(`✨ Awel is ready! Open http://localhost:${AWEL_PORT}`);
+            awel.log(`✨ Awel is ready! ${shouldOpen ? 'Opening' : 'Open'} ${url}`);
             awel.log('   Describe what you want to build and Awel will create it for you.');
         } else {
-            awel.log(`✨ Awel is ready! Open http://localhost:${AWEL_PORT}`);
+            awel.log(`✨ Awel is ready! ${shouldOpen ? 'Opening' : 'Open'} ${url}`);
             awel.log('   Look for the floating button in the bottom-right corner.');
+        }
+
+        if (shouldOpen) {
+            await open(url);
         }
     });
 

@@ -41,6 +41,7 @@ awel dev [options]       启动带有 Awel 浮层的开发服务器
 
   -p, --port <port>    目标应用端口（默认：3000）
   -v, --verbose        将 LLM 流式事件输出到 stderr
+  --no-open            不自动打开浏览器
 ```
 
 ## 工作原理
