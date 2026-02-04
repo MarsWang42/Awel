@@ -37,17 +37,22 @@ export function ConsoleChips({ entries, onEntryClick, onDismiss, onClearAll }: C
 
     return (
         <div className="mx-4 my-1.5 flex flex-col-reverse gap-2">
-            {/* Summary bar — always visible */}
+            {/* Summary bar — always visible, highlighted when errors exist */}
             <button
                 onClick={() => hasEntries && setExpanded(prev => !prev)}
-                className={`flex items-center gap-2 px-2.5 py-1.5 rounded-md border border-border bg-card/60 text-xs transition-colors ${hasEntries ? 'hover:bg-muted/60 cursor-pointer' : 'cursor-default'
-                    }`}
+                className={`flex items-center gap-2 px-2.5 py-1.5 rounded-md border text-xs transition-colors ${
+                    errorCount > 0
+                        ? 'border-red-300 bg-red-50 dark:border-red-800 dark:bg-red-950/50 animate-pulse hover:bg-red-100 dark:hover:bg-red-900/50 cursor-pointer'
+                        : warningCount > 0
+                            ? 'border-yellow-300 bg-yellow-50 dark:border-yellow-800 dark:bg-yellow-950/50 hover:bg-yellow-100 dark:hover:bg-yellow-900/50 cursor-pointer'
+                            : 'border-border bg-card/60 cursor-default'
+                }`}
             >
-                <span className="flex items-center gap-1 text-red-600/60 dark:text-red-400/60 font-medium">
+                <span className={`flex items-center gap-1 font-medium ${errorCount > 0 ? 'text-red-600 dark:text-red-400' : 'text-red-600/60 dark:text-red-400/60'}`}>
                     <XCircle className="w-3 h-3" />
                     {errorCount}
                 </span>
-                <span className="flex items-center gap-1 text-yellow-600 dark:text-yellow-400/60 font-medium">
+                <span className={`flex items-center gap-1 font-medium ${warningCount > 0 && errorCount === 0 ? 'text-yellow-600 dark:text-yellow-400' : 'text-yellow-600/60 dark:text-yellow-400/60'}`}>
                     <AlertTriangle className="w-3 h-3" />
                     {warningCount}
                 </span>
@@ -97,7 +102,22 @@ function ConsoleChip({ entry, onEntryClick, onDismiss }: {
 }) {
     const [showTooltip, setShowTooltip] = useState(false)
     const chipRef = useRef<HTMLDivElement>(null)
+    const hideTimeoutRef = useRef<number | null>(null)
     const trace = formatTrace(entry)
+
+    const clearHideTimeout = () => {
+        if (hideTimeoutRef.current !== null) {
+            window.clearTimeout(hideTimeoutRef.current)
+            hideTimeoutRef.current = null
+        }
+    }
+
+    const scheduleHide = () => {
+        clearHideTimeout()
+        hideTimeoutRef.current = window.setTimeout(() => {
+            setShowTooltip(false)
+        }, 120)
+    }
 
     const tooltipStyle = (): React.CSSProperties | undefined => {
         if (!chipRef.current) return undefined
@@ -105,15 +125,18 @@ function ConsoleChip({ entry, onEntryClick, onDismiss }: {
         return {
             position: 'fixed',
             bottom: window.innerHeight - rect.top + 6,
-            left: rect.left,
+            right: window.innerWidth - rect.right,
         }
     }
 
     return (
         <div
             ref={chipRef}
-            onMouseEnter={() => setShowTooltip(true)}
-            onMouseLeave={() => setShowTooltip(false)}
+            onMouseEnter={() => {
+                clearHideTimeout()
+                setShowTooltip(true)
+            }}
+            onMouseLeave={scheduleHide}
         >
             <button
                 onClick={() => onEntryClick(entry)}
@@ -157,12 +180,20 @@ function ConsoleChip({ entry, onEntryClick, onDismiss }: {
                 </span>
             </button>
 
-            {showTooltip && trace && (
+            {showTooltip && (
                 <div
                     style={tooltipStyle()}
-                    className="z-[9999] w-72 max-h-48 overflow-y-auto rounded-md border border-border bg-card p-2.5 text-xs text-foreground shadow-lg whitespace-pre-wrap break-words font-mono pointer-events-none"
+                    className={`z-[9999] w-72 max-h-48 overflow-y-auto rounded-md border p-2.5 text-xs shadow-lg whitespace-pre-wrap break-words font-mono pointer-events-auto ${entry.level === 'error'
+                            ? 'border-red-200 bg-red-50 text-red-900 dark:border-red-800 dark:bg-red-950 dark:text-red-100'
+                            : 'border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100'
+                        }`}
+                    onMouseEnter={() => {
+                        clearHideTimeout()
+                        setShowTooltip(true)
+                    }}
+                    onMouseLeave={scheduleHide}
                 >
-                    {entry.message}{'\n\n'}{trace}
+                    {entry.message}{trace ? `\n\n${trace}` : ''}
                 </div>
             )}
         </div>

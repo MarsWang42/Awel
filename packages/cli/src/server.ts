@@ -116,11 +116,25 @@ export async function startServer({ awelPort, targetPort, projectCwd, fresh }: S
     });
   });
 
-  app.post('/api/project/mark-ready', (c) => {
+  app.post('/api/project/mark-ready', async (c) => {
     // If in comparison mode, mark the current run as complete instead of ending fresh mode
     const state = getComparisonState(projectCwd);
     if (state && state.activeRunId) {
-      const updatedState = markRunComplete(projectCwd, state.activeRunId, true);
+      // Parse optional stats from request body
+      let stats: { duration?: number; inputTokens?: number; outputTokens?: number } | undefined;
+      try {
+        const body = await c.req.json();
+        if (body.duration !== undefined || body.inputTokens !== undefined || body.outputTokens !== undefined) {
+          stats = {
+            duration: body.duration,
+            inputTokens: body.inputTokens,
+            outputTokens: body.outputTokens,
+          };
+        }
+      } catch {
+        // No body or invalid JSON, stats remain undefined
+      }
+      const updatedState = markRunComplete(projectCwd, state.activeRunId, true, stats);
       comparisonPhase = updatedState.phase;
       return c.json({ success: true, comparison: updatedState });
     }
@@ -230,14 +244,17 @@ export async function startServer({ awelPort, targetPort, projectCwd, fresh }: S
 
   app.post('/api/comparison/runs/:id/complete', async (c) => {
     const runId = c.req.param('id');
-    let body: { success: boolean };
+    let body: { success: boolean; duration?: number; inputTokens?: number; outputTokens?: number };
     try {
       body = await c.req.json();
     } catch {
       body = { success: true };
     }
     try {
-      const state = markRunComplete(projectCwd, runId, body.success);
+      const stats = (body.duration !== undefined || body.inputTokens !== undefined || body.outputTokens !== undefined)
+        ? { duration: body.duration, inputTokens: body.inputTokens, outputTokens: body.outputTokens }
+        : undefined;
+      const state = markRunComplete(projectCwd, runId, body.success, stats);
       comparisonPhase = state.phase;
       return c.json({ success: true, state });
     } catch (err) {

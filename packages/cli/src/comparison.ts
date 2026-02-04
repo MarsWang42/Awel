@@ -13,6 +13,11 @@ export interface ComparisonRun {
     status: 'building' | 'success' | 'failed';
     prompt: string;
     createdAt: string;
+    duration?: number;
+    tokenUsage?: {
+        input: number;
+        output: number;
+    };
 }
 
 export type ComparisonPhase = 'initial' | 'building' | 'comparing';
@@ -253,7 +258,12 @@ export function switchRun(projectCwd: string, runId: string): ComparisonState {
 /**
  * Mark a run as complete (success or failed).
  */
-export function markRunComplete(projectCwd: string, runId: string, success: boolean): ComparisonState {
+export function markRunComplete(
+    projectCwd: string,
+    runId: string,
+    success: boolean,
+    stats?: { duration?: number; inputTokens?: number; outputTokens?: number }
+): ComparisonState {
     const state = getComparisonState(projectCwd);
     if (!state) {
         throw new Error('No comparison state found');
@@ -265,6 +275,17 @@ export function markRunComplete(projectCwd: string, runId: string, success: bool
     }
 
     run.status = success ? 'success' : 'failed';
+
+    // Store duration and token usage if provided
+    if (stats?.duration !== undefined) {
+        run.duration = stats.duration;
+    }
+    if (stats?.inputTokens !== undefined || stats?.outputTokens !== undefined) {
+        run.tokenUsage = {
+            input: stats.inputTokens ?? 0,
+            output: stats.outputTokens ?? 0,
+        };
+    }
 
     // Commit the final state
     commitCurrentBranch(projectCwd, run.modelId);

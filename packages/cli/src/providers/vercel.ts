@@ -119,7 +119,10 @@ Create a complete Next.js app using:
 
 ### Step 3: VERIFY
 
-After generating all files, ensure the dev server runs without errors. Fix any build issues.
+After generating all files, verify the app builds without errors:
+- Run \`npm run build\` to check for compilation errors and fix any issues
+- Do NOT start the dev server — it is already managed by Awel
+- Do NOT commit to git — Awel handles version control
 
 ## IMPORTANT GUIDELINES
 
@@ -165,7 +168,10 @@ const CREATION_SYSTEM_PROMPT_ZH = `你是 Awel 创作模式——一个专注于
 
 ### 第三步：验证
 
-生成所有文件后，确保开发服务器无错运行。修复任何构建问题。
+生成所有文件后，验证应用能够正常构建：
+- 运行 \`npm run build\` 检查编译错误并修复任何问题
+- 不要启动开发服务器——Awel 已经在管理它
+- 不要提交到 git——Awel 会处理版本控制
 
 ## 重要准则
 

@@ -1,5 +1,7 @@
 // ─── Page Context Capture & Broadcast ─────────────────────────
 
+import { dashboardIframe } from './console.js';
+
 export interface PageContext {
   url: string;
   title: string;
@@ -14,11 +16,8 @@ let currentPageContext: PageContext | null = null;
 
 export function broadcastPageContext(): void {
   if (!currentPageContext) return;
-  const sidebar = document.getElementById('awel-sidebar');
-  if (!sidebar) return;
-  const iframe = sidebar.querySelector('iframe');
-  if (!iframe?.contentWindow) return;
-  iframe.contentWindow.postMessage({ type: 'AWEL_PAGE_CONTEXT', context: currentPageContext }, '*');
+  if (!dashboardIframe?.contentWindow) return;
+  dashboardIframe.contentWindow.postMessage({ type: 'AWEL_PAGE_CONTEXT', context: currentPageContext }, '*');
 }
 
 /**

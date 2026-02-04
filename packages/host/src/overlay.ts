@@ -8,6 +8,7 @@ import {
 import {
   consoleEntries,
   setConsoleDotEl,
+  setDashboardIframe,
 } from './console.js';
 
 // ─── State ────────────────────────────────────────────────────
@@ -206,8 +207,9 @@ export function openOverlay(skipAnimation = false): void {
     background: transparent;
   `;
 
-  // Broadcast console entries when dashboard iframe loads
+  // Store reference and broadcast console entries when dashboard iframe loads
   iframe.addEventListener('load', () => {
+    setDashboardIframe(iframe);
     if (consoleEntries.length > 0 && iframe.contentWindow) {
       iframe.contentWindow.postMessage({ type: 'AWEL_CONSOLE_ENTRIES', entries: consoleEntries }, '*');
     }

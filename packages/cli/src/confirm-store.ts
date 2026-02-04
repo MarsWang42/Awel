@@ -70,3 +70,18 @@ export function rejectAllPending(): void {
         pending.delete(id);
     }
 }
+
+/**
+ * Approve all pending confirmations (when user clicks "Allow All").
+ * Returns the list of confirmIds that were approved.
+ */
+export function approveAllPending(): string[] {
+    const approvedIds: string[] = [];
+    for (const [id, entry] of pending) {
+        clearTimeout(entry.timer);
+        entry.resolve(true);
+        pending.delete(id);
+        approvedIds.push(id);
+    }
+    return approvedIds;
+}

@@ -86,6 +86,7 @@ The core server and agent orchestration layer.
 | `src/awel-config.ts` | `.awel/config.json` read/write. `AwelConfig` interface includes `fresh`, `createdAt`, `onboarded`, `skillsInstalled` fields. Helpers: `isProjectFresh()`, `markProjectReady()`. |
 | `src/onboarding.ts` | Interactive provider setup on first run; checks available LLM providers. |
 | `src/skills.ts` | Installs `.claude/skills/` markdown files for Memory and Dev Server guidance. |
+| `src/comparison.ts` | Model comparison system. Manages multiple git branches for comparing outputs from different models. |
 | `src/tools/` | Tool implementations available to the LLM (see below). |
 | `src/skills/` | Static skill files (e.g. `react-best-practices.md`), copied to dist at build time. |
 
@@ -152,7 +153,8 @@ React 18 SPA served at `/_awel/dashboard` by the CLI server.
 | `src/services/sseParser.ts` | Parses SSE events from the server stream into typed message objects. |
 | `src/types/messages.ts` | Shared message and event type definitions. |
 | `src/components/Console.tsx` | Main chat interface component. |
-| `src/components/CreationView.tsx` | Full-page creation mode UI. Three phases: initial (heading + suggestion chips + input), building (streaming chat), success (auto-redirect to app). |
+| `src/components/CreationView.tsx` | Full-page creation mode UI. Guided flow: category selection → design style → context input → building phase → success. |
+| `src/components/ComparisonView.tsx` | Model comparison UI. Shows multiple runs side-by-side, allows switching between branches, trying new models, and selecting a final version. |
 | `src/components/ModelSelector.tsx` | Model selection dropdown. Features: provider filtering, custom OpenRouter model input, recent models, env var copy helpers. Shows warning modal when selecting Claude Code (YOLO mode). Shows confirmation when switching between Claude Code and other providers (clears chat history). |
 | `src/components/ConsoleChips.tsx` | Console entry chips displayed above the input area. |
 | `src/components/DiffModal.tsx` | Diff review modal for file changes. |
@@ -236,9 +238,36 @@ User types in Dashboard UI
 - `awel dev` reads `isProjectFresh()` at startup. When `fresh`, the server sets an in-memory `isFresh` flag.
 - The proxy intercepts all HTML navigation requests (`Accept: text/html`) and serves the dashboard directly at `/` with `window.__AWEL_CREATION_MODE__=true` injected. No host script injection. Non-HTML requests (JS, CSS, HMR) still proxy to the Next.js dev server.
 - `App.tsx` detects the flag and renders `CreationView` instead of the normal sidebar layout.
-- The agent uses `CREATION_SYSTEM_PROMPT` (in `vercel.ts`) which instructs it to clarify requirements via `AskUser`, generate a complete app, and verify it builds.
-- When the agent finishes (result SSE event with `success` subtype), `CreationView` calls `POST /api/project/mark-ready`, which writes `{ fresh: false }` to `.awel/config.json` and flips the in-memory flag. The UI shows a success screen and redirects to `/`.
-- After redirect, the proxy sees `isFresh=false` and behaves normally: proxies to Next.js with host script injection. If there are build errors, the user sees the Next.js error overlay with the Awel button available.
+
+**Creation flow UI** (`CreationView.tsx`):
+- **Step 1 - Category**: User selects from 4 categories: SaaS Landing Page, Creative Portfolio, Product Showcase, Restaurant & Local.
+- **Step 2 - Design Style**: Each category offers 3 design styles (e.g., SaaS has Gradient Modern, Dark Mode Elegant, Clean Minimal).
+- **Step 3 - Context**: User provides specific context (e.g., "Project management for remote teams").
+- **Building phase**: The selected style + context generates a detailed design prompt (stored in `en.json`/`zh.json` as `promptSaas*`, `promptAgency*`, etc.). The agent executes and streams progress.
+- **Success**: When complete, shows success screen and redirects to `/`.
+
+The agent uses `CREATION_SYSTEM_PROMPT` (in `vercel.ts`) which instructs it to focus on design quality, generate complete working code, and verify the build passes.
+
+After redirect, the proxy sees `isFresh=false` and behaves normally: proxies to Next.js with host script injection. If there are build errors, the user sees the Next.js error overlay with the Awel button available.
+
+**Model comparison mode** (`comparison.ts`, `ComparisonView.tsx`):
+- Allows running the same prompt against multiple models (up to 5) to compare outputs.
+- Each run creates a separate git branch from a baseline commit captured at initialization.
+- State stored in `.awel/comparison.json` with phases: `initial` → `building` → `comparing`.
+
+**Comparison flow:**
+1. **Initialization**: When the first creation run starts, `initComparison()` captures the baseline git ref and creates a branch (e.g., `awel-run-abc12345`).
+2. **Building**: The agent generates code on this branch. When complete, `markRunComplete()` commits changes and transitions to `comparing` phase.
+3. **Comparing**: `ComparisonView` shows all runs with status (building/success/failed), timing, and token usage.
+4. **Switch runs**: User can click a run to switch git branches (`switchRun()`). The proxy reloads to show that branch's app.
+5. **Try another model**: User can edit the prompt and select a new model. `createRun()` commits the current branch and creates a new branch from baseline.
+6. **Select version**: User clicks "Use This Version". `selectRun()` merges the chosen branch to main and deletes all comparison branches.
+
+**Comparison API routes** (in `server.ts`):
+- `GET /api/comparison/runs` - Get current comparison state
+- `POST /api/comparison/runs` - Create a new comparison run with a different model
+- `POST /api/comparison/runs/:id/switch` - Switch to a different run's branch
+- `POST /api/comparison/runs/:id/select` - Select a run as the final version
 
 **Model switching:**
 - Chat history is preserved when switching between models within the same provider type.
@@ -255,6 +284,7 @@ Awel stores project-specific data in the `.awel/` directory:
 | `.awel/history.json` | Persisted chat history (max 500 messages) |
 | `.awel/session.json` | Session context: messages, model, provider |
 | `.awel/memory.json` | Persistent project memories with tags and scopes |
+| `.awel/comparison.json` | Comparison mode state: baseline ref, runs array, active run ID, phase |
 
 ## Key Conventions
 

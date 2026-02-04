@@ -144,7 +144,16 @@ export function CreationView({ initialModel, initialModelProvider, onModelChange
         const lastResult = [...messages].reverse().find(m => m.type === 'result')
         if (lastResult && lastResult.resultSubtype === 'success') {
             // Mark the run as complete (this transitions to comparing phase)
-            fetch('/api/project/mark-ready', { method: 'POST' })
+            // Include duration and token usage stats for the comparison view
+            fetch('/api/project/mark-ready', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    duration: lastResult.durationMs,
+                    inputTokens: lastResult.inputTokens,
+                    outputTokens: lastResult.outputTokens,
+                }),
+            })
                 .then(r => r.json())
                 .then(data => {
                     if (data.comparison) {

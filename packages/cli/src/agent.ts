@@ -6,7 +6,7 @@ import { addToHistory, getHistory, clearHistory } from './sse.js';
 import { getProviderCatalog } from './providers/registry.js';
 import { getOrCreateSession, getSessionMessages, appendUserMessage, appendResponseMessages, resetSession } from './session.js';
 import { getActivePlan, approvePlan } from './plan-store.js';
-import { resolveConfirmation, setAutoApprove, resetAutoApprove } from './confirm-store.js';
+import { resolveConfirmation, setAutoApprove, resetAutoApprove, approveAllPending } from './confirm-store.js';
 import type { AutoApproveCategory } from './confirm-store.js';
 import { restartDevServer, getDevServerStatus } from './subprocess.js';
 import { readMemories, deleteMemory } from './memory.js';
@@ -346,11 +346,18 @@ export function createAgentRoute(projectCwd: string, targetPort: number, isFresh
         if (!confirmId || typeof approved !== 'boolean') {
             return c.json({ success: false, error: 'Missing confirmId or approved' }, 400);
         }
+
+        // Resolve the clicked confirmation first
+        const resolved = resolveConfirmation(confirmId, approved);
+
+        // If "Allow All" was clicked and approved, also approve all other pending confirmations
+        let alsoApproved: string[] = [];
         if (approved && allowAll && category) {
             setAutoApprove(category, true);
+            alsoApproved = approveAllPending();
         }
-        const resolved = resolveConfirmation(confirmId, approved);
-        return c.json({ success: resolved });
+
+        return c.json({ success: resolved, alsoApproved });
     });
 
     // ─── Dev Server Management ──────────────────────────────

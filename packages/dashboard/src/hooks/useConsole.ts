@@ -178,6 +178,8 @@ export function useConsole(selectedModel: string, selectedModelProvider: string,
             }
         }
         window.addEventListener('message', handleMessage)
+        // Request current console entries on mount (in case errors occurred before this component loaded)
+        window.parent.postMessage({ type: 'AWEL_REQUEST_CONSOLE_ENTRIES' }, '*')
         return () => window.removeEventListener('message', handleMessage)
     }, [])
 
@@ -602,11 +604,24 @@ export function useConsole(selectedModel: string, selectedModelProvider: string,
 
     const handleConfirmResponse = useCallback((confirmId: string, approved: boolean, opts?: { allowAll?: boolean; category?: string }) => {
         // Optimistically update the message state
-        setMessages(prev => prev.map(m =>
-            m.type === 'confirm' && m.confirmId === confirmId
-                ? { ...m, confirmResolved: true, confirmApproved: approved }
-                : m
-        ))
+        if (approved && opts?.allowAll) {
+            // "Allow All" - approve all unresolved confirm messages of the same category
+            const targetCategory = opts.category
+            setMessages(prev => prev.map(m => {
+                if (m.type !== 'confirm' || m.confirmResolved) return m
+                // Check if this confirm belongs to the same category
+                const msgCategory = m.confirmToolName === 'Bash' ? 'bash' : 'fileWrites'
+                if (targetCategory && msgCategory !== targetCategory) return m
+                return { ...m, confirmResolved: true, confirmApproved: true }
+            }))
+        } else {
+            // Single approval/denial
+            setMessages(prev => prev.map(m =>
+                m.type === 'confirm' && m.confirmId === confirmId
+                    ? { ...m, confirmResolved: true, confirmApproved: approved }
+                    : m
+            ))
+        }
 
         fetch('/api/confirm', {
             method: 'POST',
@@ -640,6 +655,10 @@ export function useConsole(selectedModel: string, selectedModelProvider: string,
                 break
             }
         }
+
+        // Count unresolved confirm messages to show one at a time with a queue indicator
+        const unresolvedConfirms = messages.filter(m => m.type === 'confirm' && !m.confirmResolved)
+        let shownUnresolvedConfirm = false
 
         while (i < messages.length) {
             const msg = messages[i]
@@ -729,17 +748,35 @@ export function useConsole(selectedModel: string, selectedModelProvider: string,
                     }) : null
                     break
                 case 'confirm':
-                    element = msg.confirmId ? createElement(ConfirmMessage, {
-                        key: msg.id,
-                        confirmId: msg.confirmId,
-                        toolName: msg.confirmToolName || 'Tool',
-                        summary: msg.confirmSummary || '',
-                        details: msg.confirmDetails,
-                        resolved: msg.confirmResolved,
-                        approved: msg.confirmApproved,
-                        onConfirm: handleConfirmResponse,
-                        disabled: aborted,
-                    }) : null
+                    // Show resolved confirms, but only show ONE unresolved confirm at a time
+                    if (msg.confirmResolved) {
+                        element = msg.confirmId ? createElement(ConfirmMessage, {
+                            key: msg.id,
+                            confirmId: msg.confirmId,
+                            toolName: msg.confirmToolName || 'Tool',
+                            summary: msg.confirmSummary || '',
+                            details: msg.confirmDetails,
+                            resolved: true,
+                            approved: msg.confirmApproved,
+                            onConfirm: handleConfirmResponse,
+                            disabled: aborted,
+                        }) : null
+                    } else if (!shownUnresolvedConfirm) {
+                        shownUnresolvedConfirm = true
+                        element = msg.confirmId ? createElement(ConfirmMessage, {
+                            key: msg.id,
+                            confirmId: msg.confirmId,
+                            toolName: msg.confirmToolName || 'Tool',
+                            summary: msg.confirmSummary || '',
+                            details: msg.confirmDetails,
+                            resolved: false,
+                            approved: msg.confirmApproved,
+                            onConfirm: handleConfirmResponse,
+                            disabled: aborted,
+                            pendingCount: unresolvedConfirms.length,
+                        }) : null
+                    }
+                    // Skip other unresolved confirms (they'll appear after this one is resolved)
                     break
                 case 'result':
                     element = createElement(ResultMessage, {

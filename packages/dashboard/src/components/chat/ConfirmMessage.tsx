@@ -10,6 +10,7 @@ interface ConfirmMessageProps {
     approved?: boolean
     onConfirm: (confirmId: string, approved: boolean, opts?: { allowAll?: boolean; category?: string }) => void
     disabled?: boolean
+    pendingCount?: number
 }
 
 type DiffLine = { type: 'same' | 'remove' | 'add'; text: string }
@@ -80,7 +81,7 @@ function DiffView({ oldStr, newStr }: { oldStr: string; newStr: string }) {
     )
 }
 
-export function ConfirmMessage({ confirmId, toolName, summary, details, resolved, approved, onConfirm, disabled }: ConfirmMessageProps) {
+export function ConfirmMessage({ confirmId, toolName, summary, details, resolved, approved, onConfirm, disabled, pendingCount }: ConfirmMessageProps) {
     const { t } = useTranslation()
     const inactive = !!resolved || !!disabled
 
@@ -90,6 +91,8 @@ export function ConfirmMessage({ confirmId, toolName, summary, details, resolved
         : toolName === 'Write' ? 'confirmWriteHeader'
         : toolName === 'Edit' || toolName === 'MultiEdit' ? 'confirmEditHeader'
         : 'confirmBashHeader'
+
+    const showQueueIndicator = !resolved && pendingCount && pendingCount > 1
 
     const renderDetails = () => {
         if (toolName === 'Bash') {
@@ -191,6 +194,11 @@ export function ConfirmMessage({ confirmId, toolName, summary, details, resolved
                     ) : (
                         <span className="text-confirm-header">{t(headerKey)}</span>
                     )}
+                    {showQueueIndicator && (
+                        <span className="ml-auto text-[10px] font-normal text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                            1 of {pendingCount}
+                        </span>
+                    )}
                 </CardTitle>
             </CardHeader>
 
@@ -220,7 +228,12 @@ export function ConfirmMessage({ confirmId, toolName, summary, details, resolved
                             {t('confirmDeny')}
                         </button>
                     </div>
-                    <p className="text-[10px] text-muted-foreground text-center">{t('confirmAllowAllHint')}</p>
+                    <p className="text-[10px] text-muted-foreground text-center">
+                        {showQueueIndicator
+                            ? t('confirmAllowAllHintPending', { count: pendingCount })
+                            : t('confirmAllowAllHint')
+                        }
+                    </p>
                 </CardFooter>
             )}
         </Card>

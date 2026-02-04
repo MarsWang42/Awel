@@ -2,6 +2,7 @@
 
 import { isAwelElement } from './state.js';
 import { isSidebarVisible, openOverlay } from './overlay.js';
+import { dashboardIframe } from './console.js';
 
 // ─── State ────────────────────────────────────────────────────
 
@@ -573,15 +574,11 @@ function finishAnnotation(): void {
 
   // Wait a tick for the iframe to be available, then send
   setTimeout(() => {
-    const sidebar = document.getElementById('awel-sidebar');
-    if (sidebar) {
-      const iframe = sidebar.querySelector('iframe');
-      if (iframe?.contentWindow) {
-        iframe.contentWindow.postMessage({
-          type: 'AWEL_SCREENSHOT_ANNOTATION',
-          dataUrl: finalDataUrl,
-        }, '*');
-      }
+    if (dashboardIframe?.contentWindow) {
+      dashboardIframe.contentWindow.postMessage({
+        type: 'AWEL_SCREENSHOT_ANNOTATION',
+        dataUrl: finalDataUrl,
+      }, '*');
     }
     cleanupAnnotationOverlay();
   }, 300);

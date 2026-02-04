@@ -13,11 +13,13 @@ import { SIDEBAR_STATE_KEY, DASHBOARD_URL, setResolvedTheme } from './state.js';
 import {
   consoleEntries,
   consoleHasUnviewed,
+  dashboardIframe,
   setConsoleEntries,
   setConsoleHasUnviewed,
   updateConsoleDot,
   broadcastConsoleEntries,
   setupConsoleInterception,
+  setDashboardIframe,
 } from './console.js';
 import {
   isSidebarVisible,
@@ -60,7 +62,10 @@ function createComparisonOverlay(): void {
     style.textContent = `
       #awel-comparison-overlay {
         position: fixed;
-        inset: 0;
+        bottom: 0;
+        right: 0;
+        width: 420px;
+        height: 500px;
         z-index: 999999;
         pointer-events: none;
       }
@@ -82,6 +87,11 @@ function createComparisonOverlay(): void {
   // Pass comparison mode via URL parameter since the iframe has its own window
   iframe.src = DASHBOARD_URL + '?mode=comparison';
 
+  // Store reference when iframe loads
+  iframe.addEventListener('load', () => {
+    setDashboardIframe(iframe);
+  });
+
   overlay.appendChild(iframe);
   document.documentElement.appendChild(overlay);
 }
@@ -91,8 +101,7 @@ function closeComparisonOverlay(): void {
 }
 
 function updateComparisonTheme(theme: 'light' | 'dark'): void {
-  const iframe = document.querySelector('#awel-comparison-overlay iframe') as HTMLIFrameElement | null;
-  iframe?.contentWindow?.postMessage({ type: 'AWEL_THEME', theme }, '*');
+  dashboardIframe?.contentWindow?.postMessage({ type: 'AWEL_THEME', theme }, '*');
 }
 
 // ─── Message Handler ──────────────────────────────────────────
@@ -167,9 +176,39 @@ window.addEventListener('message', (event) => {
   if (event.data?.type === 'AWEL_REQUEST_PAGE_CONTEXT') {
     broadcastPageContext();
   }
+  if (event.data?.type === 'AWEL_REQUEST_CONSOLE_ENTRIES') {
+    broadcastConsoleEntries();
+  }
   if (event.data?.type === 'AWEL_THEME') {
     setResolvedTheme(event.data.theme);
     updateComparisonTheme(event.data.theme);
+  }
+  if (event.data?.type === 'AWEL_COMPARISON_EXPAND') {
+    const overlay = document.getElementById('awel-comparison-overlay');
+    if (overlay) {
+      overlay.style.top = '0';
+      overlay.style.height = 'auto';
+    }
+  }
+  if (event.data?.type === 'AWEL_COMPARISON_COLLAPSE') {
+    const overlay = document.getElementById('awel-comparison-overlay');
+    if (overlay) {
+      overlay.style.top = 'auto';
+      overlay.style.height = '500px';
+    }
+  }
+  if (event.data?.type === 'AWEL_NAVIGATE') {
+    const { action, url, autoSubmit } = event.data;
+    if (autoSubmit) {
+      try {
+        sessionStorage.setItem('awel-auto-submit', 'true');
+      } catch { /* ignore */ }
+    }
+    if (action === 'reload') {
+      window.location.reload();
+    } else if (action === 'href' && url) {
+      window.location.href = url;
+    }
   }
 });
 

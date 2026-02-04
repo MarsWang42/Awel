@@ -320,7 +320,8 @@ export function Console({ selectedModel, selectedModelProvider, modelReady, onMo
         const text = getTextFromEditable()
         const elements = getChipsFromEditable()
         const hasImages = imageAttachments.length > 0
-        const hasContent = !!text || elements.length > 0 || hasImages
+        const hasConsoleEntries = attachedConsoleEntries.length > 0
+        const hasContent = !!text || elements.length > 0 || hasImages || hasConsoleEntries
         if (!hasContent || isLoading) return
 
         let prompt = text
@@ -328,6 +329,7 @@ export function Console({ selectedModel, selectedModelProvider, modelReady, onMo
             const parts: string[] = []
             if (elements.length > 0) parts.push(t('attachedElements'))
             if (hasImages) parts.push(imageAttachments.length === 1 ? t('attachedImage') : t('attachedImages'))
+            if (hasConsoleEntries) parts.push(t('attachedErrors', { count: attachedConsoleEntries.length }))
             prompt = `(${t('seeAttached', { parts: parts.join(' & ') })})`
         }
         const contentSegments = getContentSegmentsFromEditable()
@@ -337,7 +339,7 @@ export function Console({ selectedModel, selectedModelProvider, modelReady, onMo
             contentSegments,
         })
         clearEditable()
-    }, [modelReady, onModelRequired, getTextFromEditable, getChipsFromEditable, getContentSegmentsFromEditable, imageAttachments, isLoading, submitMessage, clearEditable, t])
+    }, [modelReady, onModelRequired, getTextFromEditable, getChipsFromEditable, getContentSegmentsFromEditable, imageAttachments, attachedConsoleEntries, isLoading, submitMessage, clearEditable, t])
 
     const handleEditableKeyDown = useCallback((e: React.KeyboardEvent) => {
         if (e.key === 'Enter' && !e.shiftKey) {
@@ -506,7 +508,7 @@ export function Console({ selectedModel, selectedModelProvider, modelReady, onMo
                     ) : (
                         <Button
                             type="submit"
-                            disabled={inputEmpty && imageAttachments.length === 0}
+                            disabled={inputEmpty && imageAttachments.length === 0 && attachedConsoleEntries.length === 0}
                             className="bg-primary hover:bg-primary/90 text-primary-foreground"
                         >
                             <Send className="w-4 h-4" />

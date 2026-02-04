@@ -15,9 +15,14 @@ import { consoleDedupeKey, formatConsoleArgs } from './consoleUtils.js';
 export let consoleEntries: ConsoleEntry[] = [];
 export let consoleHasUnviewed = false;
 export let consoleDotEl: HTMLDivElement | null = null;
+export let dashboardIframe: HTMLIFrameElement | null = null;
 
 export function setConsoleDotEl(el: HTMLDivElement | null): void {
   consoleDotEl = el;
+}
+
+export function setDashboardIframe(iframe: HTMLIFrameElement | null): void {
+  dashboardIframe = iframe;
 }
 
 export function setConsoleEntries(entries: ConsoleEntry[]): void {
@@ -33,11 +38,9 @@ export function setConsoleHasUnviewed(value: boolean): void {
 // consoleDedupeKey moved to consoleUtils.ts
 
 export function broadcastConsoleEntries(): void {
-  const sidebar = document.getElementById('awel-sidebar');
-  if (!sidebar) return;
-  const iframe = sidebar.querySelector('iframe');
-  if (!iframe?.contentWindow) return;
-  iframe.contentWindow.postMessage({ type: 'AWEL_CONSOLE_ENTRIES', entries: consoleEntries }, '*');
+  if (dashboardIframe?.contentWindow) {
+    dashboardIframe.contentWindow.postMessage({ type: 'AWEL_CONSOLE_ENTRIES', entries: consoleEntries }, '*');
+  }
 }
 
 export function updateConsoleDot(): void {

@@ -14,6 +14,7 @@
     "attachedElements": "已关联的元素",
     "attachedImage": "已关联的图片",
     "attachedImages": "已关联的图片",
+    "attachedErrors": "{{count}} 个控制台错误",
     "seeAttached": "查阅 {{parts}}",
     "selectModel": "切换模型",
     "taskCompleted": "目标任务已达成",
@@ -99,6 +100,7 @@
     "confirmAllow": "允许",
     "confirmAllowAll": "全部允许",
     "confirmAllowAllHint": "在整个会话期间有效，直到清除聊天记录。",
+    "confirmAllowAllHintPending": "将批准全部 {{count}} 个待处理请求及后续请求。",
     "confirmDeny": "拒绝",
     "confirmApproved": "已允许",
     "confirmRejected": "已拒绝",
@@ -154,5 +156,9 @@
     "comparisonOpenChat": "打开对话",
     "comparisonBack": "返回",
     "comparisonNoModels": "没有更多可用模型",
-    "comparisonMaxRuns": "最多支持 5 个模型对比"
+    "comparisonMaxRuns": "最多支持 5 个模型对比",
+    "comparisonPrompt": "提示词",
+    "comparisonPromptPlaceholder": "修改提示词...",
+    "comparisonSelectModel": "选择模型",
+    "comparisonRegenerate": "重新生成"
 }

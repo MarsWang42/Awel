@@ -16,6 +16,17 @@ describe('consoleDedupeKey', () => {
         // level: + 200 chars
         expect(key).toBe('error:' + 'x'.repeat(200));
     });
+
+    it('normalizes common error prefixes', () => {
+        expect(consoleDedupeKey('error', 'Error: Something failed')).toBe('error:Something failed');
+        expect(consoleDedupeKey('error', 'Uncaught Error: Something failed')).toBe('error:Something failed');
+        expect(consoleDedupeKey('error', 'TypeError: undefined is not a function')).toBe('error:undefined is not a function');
+    });
+
+    it('uses only first line for multiline messages', () => {
+        const multiline = 'First line\nSecond line\nThird line';
+        expect(consoleDedupeKey('error', multiline)).toBe('error:First line');
+    });
 });
 
 describe('formatConsoleArgs', () => {
