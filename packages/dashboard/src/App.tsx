@@ -7,9 +7,12 @@ import { Console } from './components/Console'
 import { ModelSelector, type ModelSelectorHandle } from './components/ModelSelector'
 import { DiffModal, type FileDiff } from './components/DiffModal'
 import { CreationView } from './components/CreationView'
+import { ComparisonView } from './components/ComparisonView'
 import { useTheme } from './hooks/useTheme'
 
 const IS_CREATION_MODE = !!(window as any).__AWEL_CREATION_MODE__
+const IS_COMPARISON_MODE = !!(window as any).__AWEL_COMPARISON_MODE__ ||
+    new URLSearchParams(window.location.search).get('mode') === 'comparison'
 
 function App() {
     const { t } = useTranslation()
@@ -94,6 +97,10 @@ function App() {
                 onModelChange={handleModelChange}
             />
         )
+    }
+
+    if (IS_COMPARISON_MODE) {
+        return <ComparisonView />
     }
 
     return (

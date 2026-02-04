@@ -52,6 +52,7 @@ const ChatRequestSchema = z.object({
     consoleEntries: z.array(ConsoleEntrySchema).optional(),
     images: z.array(z.string()).optional(),
     pageContext: PageContextSchema.optional(),
+    language: z.string().optional(),
 });
 
 type ConsoleEntryInput = z.infer<typeof ConsoleEntrySchema>;
@@ -138,7 +139,7 @@ export function createAgentRoute(projectCwd: string, targetPort: number, isFresh
             return c.json({ success: false, error: message }, 400);
         }
 
-        const { prompt, model, modelProvider, consoleEntries, images, pageContext } = parsed.data;
+        const { prompt, model, modelProvider, consoleEntries, images, pageContext, language } = parsed.data;
         const modelId = model ?? DEFAULT_MODEL;
 
         // Prepend context blocks to the prompt
@@ -186,7 +187,7 @@ export function createAgentRoute(projectCwd: string, targetPort: number, isFresh
             // Appending eagerly would leave orphan user messages in the session when
             // the stream is aborted or paused for user input, causing consecutive
             // user messages that trigger API 400 errors (especially with Anthropic).
-            provider.streamResponse(adapter, messages, { projectCwd, targetPort, signal, creationMode: isFresh?.() })
+            provider.streamResponse(adapter, messages, { projectCwd, targetPort, signal, creationMode: isFresh?.(), language })
                 .then((responseMessages) => {
                     if (responseMessages.length > 0) {
                         appendUserMessage(userContent);

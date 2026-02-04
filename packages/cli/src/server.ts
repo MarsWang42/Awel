@@ -13,6 +13,21 @@ import { awel } from './logger.js';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { readFileSync, existsSync } from 'fs';
+import {
+    getComparisonState,
+    initComparison,
+    createRun,
+    switchRun,
+    selectRun,
+    deleteRun,
+    markRunComplete,
+    resumeComparison,
+    getComparisonPhase,
+    type ComparisonPhase,
+} from './comparison.js';
+import { clearHistory } from './sse.js';
+import { resetSession } from './session.js';
+import { resetAutoApprove } from './confirm-store.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -51,6 +66,16 @@ export async function startServer({ awelPort, targetPort, projectCwd, fresh }: S
   const app = new Hono();
 
   let isFresh = fresh ?? false;
+  let comparisonPhase: ComparisonPhase | null = null;
+
+  // Resume comparison state if it exists
+  const resumedState = resumeComparison(projectCwd);
+  if (resumedState) {
+    comparisonPhase = resumedState.phase;
+    if (comparisonPhase) {
+      isFresh = false;
+    }
+  }
 
   // Create a proxy for WebSocket connections
   const wsProxy = httpProxy.createProxyServer({
@@ -71,7 +96,7 @@ export async function startServer({ awelPort, targetPort, projectCwd, fresh }: S
   });
 
   // Mount agent API routes
-  app.route('/', createAgentRoute(projectCwd, targetPort, () => isFresh));
+  app.route('/', createAgentRoute(projectCwd, targetPort, () => isFresh || comparisonPhase === 'building'));
 
   // Mount undo API routes
   app.route('/', createUndoRoute(projectCwd));
@@ -84,13 +109,153 @@ export async function startServer({ awelPort, targetPort, projectCwd, fresh }: S
 
   // ─── Project Status Endpoints ─────────────────────────────
   app.get('/api/project/status', (c) => {
-    return c.json({ fresh: isFresh });
+    return c.json({
+      fresh: isFresh,
+      comparisonPhase,
+      comparison: getComparisonState(projectCwd),
+    });
   });
 
   app.post('/api/project/mark-ready', (c) => {
+    // If in comparison mode, mark the current run as complete instead of ending fresh mode
+    const state = getComparisonState(projectCwd);
+    if (state && state.activeRunId) {
+      const updatedState = markRunComplete(projectCwd, state.activeRunId, true);
+      comparisonPhase = updatedState.phase;
+      return c.json({ success: true, comparison: updatedState });
+    }
+
     markProjectReady(projectCwd);
     isFresh = false;
     return c.json({ success: true });
+  });
+
+  // ─── Comparison API Endpoints ─────────────────────────────
+  app.get('/api/comparison/runs', (c) => {
+    const state = getComparisonState(projectCwd);
+    if (!state) {
+      return c.json({ runs: [], activeRunId: null, phase: null });
+    }
+    return c.json({
+      runs: state.runs,
+      activeRunId: state.activeRunId,
+      phase: state.phase,
+      originalPrompt: state.originalPrompt,
+    });
+  });
+
+  app.post('/api/comparison/runs', async (c) => {
+    let body: { modelId: string; modelLabel: string; modelProvider: string; providerLabel: string; prompt?: string };
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ success: false, error: 'Invalid JSON' }, 400);
+    }
+
+    const { modelId, modelLabel, modelProvider, providerLabel, prompt } = body;
+    if (!modelId || !modelProvider) {
+      return c.json({ success: false, error: 'Missing modelId or modelProvider' }, 400);
+    }
+
+    try {
+      const existingState = getComparisonState(projectCwd);
+
+      if (!existingState) {
+        // First run: initialize comparison mode
+        if (!prompt) {
+          return c.json({ success: false, error: 'Missing prompt for first run' }, 400);
+        }
+        const state = initComparison(projectCwd, prompt, modelId, modelLabel || modelId, modelProvider, providerLabel || modelProvider);
+        comparisonPhase = state.phase;
+        isFresh = false; // No longer in fresh mode, now in comparison mode
+        return c.json({
+          success: true,
+          run: state.runs[0],
+          state,
+        });
+      }
+
+      // Subsequent run: create new branch, clear chat history for fresh start
+      const { state, run } = createRun(projectCwd, modelId, modelLabel || modelId, modelProvider, providerLabel || modelProvider);
+      comparisonPhase = state.phase;
+
+      // Clear chat history so the new run starts fresh
+      clearHistory();
+      resetSession();
+      resetAutoApprove();
+
+      return c.json({
+        success: true,
+        run,
+        state,
+        autoSubmit: true, // Signal to dashboard to auto-submit the originalPrompt
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      return c.json({ success: false, error: message }, 400);
+    }
+  });
+
+  app.post('/api/comparison/runs/:id/switch', async (c) => {
+    const runId = c.req.param('id');
+    try {
+      const state = switchRun(projectCwd, runId);
+      comparisonPhase = state.phase;
+      return c.json({ success: true, state });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      return c.json({ success: false, error: message }, 400);
+    }
+  });
+
+  app.post('/api/comparison/runs/:id/select', async (c) => {
+    const runId = c.req.param('id');
+
+    // Each step is independent - don't let one failure prevent others
+    try { selectRun(projectCwd, runId); } catch { /* merge may have succeeded */ }
+
+    // Always clear comparison phase
+    comparisonPhase = null;
+
+    // Always mark project ready
+    try { markProjectReady(projectCwd); } catch { /* non-critical */ }
+
+    // Always clear session state
+    try { clearHistory(); } catch { /* non-critical */ }
+    try { resetSession(); } catch { /* non-critical */ }
+    try { resetAutoApprove(); } catch { /* non-critical */ }
+
+    return c.json({ success: true });
+  });
+
+  app.post('/api/comparison/runs/:id/complete', async (c) => {
+    const runId = c.req.param('id');
+    let body: { success: boolean };
+    try {
+      body = await c.req.json();
+    } catch {
+      body = { success: true };
+    }
+    try {
+      const state = markRunComplete(projectCwd, runId, body.success);
+      comparisonPhase = state.phase;
+      return c.json({ success: true, state });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      return c.json({ success: false, error: message }, 400);
+    }
+  });
+
+  app.delete('/api/comparison/runs/:id', async (c) => {
+    const runId = c.req.param('id');
+    try {
+      const state = deleteRun(projectCwd, runId);
+      comparisonPhase = state.phase;
+      return c.json({ success: true, state });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      return c.json({ success: false, error: message }, 400);
+    }
   });
 
   // Serve the host script
@@ -129,7 +294,7 @@ export async function startServer({ awelPort, targetPort, projectCwd, fresh }: S
   });
 
   // Proxy all other requests to the target app
-  app.all('*', createProxyMiddleware(targetPort, projectCwd, () => isFresh));
+  app.all('*', createProxyMiddleware(targetPort, projectCwd, () => isFresh, () => comparisonPhase));
 
   // Create the HTTP server with Hono
   const server = serve({

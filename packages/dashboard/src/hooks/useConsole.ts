@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { createElement } from 'react'
+import i18n from '../i18n'
 import {
     AssistantMessage,
     UserMessage,
@@ -385,7 +386,12 @@ export function useConsole(selectedModel: string, selectedModelProvider: string,
 
         es.onopen = () => {
             // Connection established — now send the prompt
-            const body: Record<string, unknown> = { prompt, model: selectedModel, modelProvider: selectedModelProvider }
+            const body: Record<string, unknown> = {
+                prompt,
+                model: selectedModel,
+                modelProvider: selectedModelProvider,
+                language: i18n.language,
+            }
             if (consoleEntries && consoleEntries.length > 0) {
                 body.consoleEntries = consoleEntries
             }

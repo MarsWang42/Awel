@@ -15,12 +15,80 @@ interface ProviderEntry {
     models: { id: string; label: string }[]
 }
 
-const SUGGESTION_CHIPS = [
-    { labelKey: 'creationChipEcommerce', fallback: 'E-commerce store' },
-    { labelKey: 'creationChipBlog', fallback: 'Blog platform' },
-    { labelKey: 'creationChipDashboard', fallback: 'Admin dashboard' },
-    { labelKey: 'creationChipPortfolio', fallback: 'Portfolio site' },
+interface StyleOption {
+    nameKey: string
+    descKey: string
+    promptKey: string
+}
+
+interface CategoryOption {
+    labelKey: string
+    fallback: string
+    icon: string
+    styles: StyleOption[]
+}
+
+const CREATION_CATEGORIES: CategoryOption[] = [
+    {
+        labelKey: 'creationChipSaaS',
+        fallback: 'SaaS Landing Page',
+        icon: '🚀',
+        styles: [
+            { nameKey: 'styleSaasGradientName', descKey: 'styleSaasGradientDesc', promptKey: 'promptSaasGradient' },
+            { nameKey: 'styleSaasDarkName', descKey: 'styleSaasDarkDesc', promptKey: 'promptSaasDark' },
+            { nameKey: 'styleSaasMinimalName', descKey: 'styleSaasMinimalDesc', promptKey: 'promptSaasMinimal' }
+        ]
+    },
+    {
+        labelKey: 'creationChipAgency',
+        fallback: 'Creative Portfolio',
+        icon: '🎨',
+        styles: [
+            { nameKey: 'styleAgencyEditorialName', descKey: 'styleAgencyEditorialDesc', promptKey: 'promptAgencyEditorial' },
+            { nameKey: 'styleAgencyBrutalistName', descKey: 'styleAgencyBrutalistDesc', promptKey: 'promptAgencyBrutalist' },
+            { nameKey: 'styleAgencyElegantName', descKey: 'styleAgencyElegantDesc', promptKey: 'promptAgencyElegant' }
+        ]
+    },
+    {
+        labelKey: 'creationChipProduct',
+        fallback: 'Product Showcase',
+        icon: '✨',
+        styles: [
+            { nameKey: 'styleProductLuxuryName', descKey: 'styleProductLuxuryDesc', promptKey: 'promptProductLuxury' },
+            { nameKey: 'styleProductGlassName', descKey: 'styleProductGlassDesc', promptKey: 'promptProductGlass' },
+            { nameKey: 'styleProductBoldName', descKey: 'styleProductBoldDesc', promptKey: 'promptProductBold' }
+        ]
+    },
+    {
+        labelKey: 'creationChipLocal',
+        fallback: 'Restaurant & Local',
+        icon: '🍽️',
+        styles: [
+            { nameKey: 'styleLocalWarmName', descKey: 'styleLocalWarmDesc', promptKey: 'promptLocalWarm' },
+            { nameKey: 'styleLocalModernName', descKey: 'styleLocalModernDesc', promptKey: 'promptLocalModern' },
+            { nameKey: 'styleLocalRusticName', descKey: 'styleLocalRusticDesc', promptKey: 'promptLocalRustic' }
+        ]
+    }
 ]
+
+interface ComparisonRun {
+    id: string
+    branchName: string
+    modelId: string
+    modelLabel: string
+    modelProvider: string
+    providerLabel: string
+    status: 'building' | 'success' | 'failed'
+    prompt: string
+    createdAt: string
+}
+
+interface ComparisonState {
+    runs: ComparisonRun[]
+    activeRunId: string | null
+    phase: 'initial' | 'building' | 'comparing' | null
+    originalPrompt?: string
+}
 
 interface CreationViewProps {
     initialModel: string
@@ -37,7 +105,13 @@ export function CreationView({ initialModel, initialModelProvider, onModelChange
     const [phase, setPhase] = useState<'initial' | 'building' | 'success'>('initial')
     const [modelReady, setModelReady] = useState(false)
     const [providers, setProviders] = useState<ProviderEntry[]>([])
+    const [selectedCategory, setSelectedCategory] = useState<CategoryOption | null>(null)
+    const [selectedStyle, setSelectedStyle] = useState<StyleOption | null>(null)
+    const [contextInput, setContextInput] = useState('')
+    const [comparisonState, setComparisonState] = useState<ComparisonState | null>(null)
+    const [pendingAutoSubmit, setPendingAutoSubmit] = useState<string | null>(null)
     const inputRef = useRef<HTMLTextAreaElement>(null)
+    const contextInputRef = useRef<HTMLInputElement>(null)
     const messagesEndRef = useRef<HTMLDivElement>(null)
     const modelSelectorRef = useRef<ModelSelectorHandle>(null)
 
@@ -64,14 +138,23 @@ export function CreationView({ initialModel, initialModelProvider, onModelChange
         }
     }, [messages.length, phase])
 
-    // When the agent finishes successfully, mark the project as ready and transition.
+    // When the agent finishes successfully, mark the project/run as ready and transition.
     useEffect(() => {
         if (phase !== 'building') return
         const lastResult = [...messages].reverse().find(m => m.type === 'result')
         if (lastResult && lastResult.resultSubtype === 'success') {
-            fetch('/api/project/mark-ready', { method: 'POST' }).catch(() => {})
+            // Mark the run as complete (this transitions to comparing phase)
+            fetch('/api/project/mark-ready', { method: 'POST' })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.comparison) {
+                        setComparisonState(data.comparison)
+                    }
+                })
+                .catch(() => {})
             setPhase('success')
             setTimeout(() => {
+                // Redirect to app - comparison sidebar will be shown by host script
                 window.location.href = '/'
             }, 3000)
         }
@@ -103,6 +186,46 @@ export function CreationView({ initialModel, initialModelProvider, onModelChange
         }).catch(() => {})
     }, [])
 
+    // Check for existing comparison state (e.g., resuming after page reload or "Try Another Model")
+    useEffect(() => {
+        fetch('/api/comparison/runs').then(r => r.json()).then((data: ComparisonState) => {
+            if (data.phase === 'building' && data.activeRunId) {
+                setComparisonState(data)
+                const activeRun = data.runs.find(r => r.id === data.activeRunId)
+                if (activeRun) {
+                    // Resume building phase with the active run's model
+                    setSelectedModel(activeRun.modelId)
+                    setSelectedModelProvider(activeRun.modelProvider)
+                    setModelReady(true)
+                    setPhase('building')
+
+                    // Check if we should auto-submit (coming from "Try Another Model")
+                    let shouldAutoSubmit = false
+                    try {
+                        shouldAutoSubmit = sessionStorage.getItem('awel-auto-submit') === 'true'
+                        if (shouldAutoSubmit) {
+                            sessionStorage.removeItem('awel-auto-submit')
+                        }
+                    } catch { /* ignore storage errors */ }
+
+                    if (shouldAutoSubmit && data.originalPrompt) {
+                        // Queue the prompt for auto-submit after model state is updated
+                        setPendingAutoSubmit(data.originalPrompt)
+                    }
+                }
+            }
+        }).catch(() => {})
+    }, [])
+
+    // Handle pending auto-submit after model state is ready
+    useEffect(() => {
+        if (pendingAutoSubmit && modelReady && !isLoading) {
+            const prompt = pendingAutoSubmit
+            setPendingAutoSubmit(null)
+            submitMessage(prompt)
+        }
+    }, [pendingAutoSubmit, modelReady, isLoading, submitMessage])
+
     const handleModelChange = useCallback((modelId: string, modelProvider: string) => {
         setSelectedModel(modelId)
         setSelectedModelProvider(modelProvider)
@@ -116,12 +239,45 @@ export function CreationView({ initialModel, initialModelProvider, onModelChange
         setModelReady(valid)
     }, [])
 
-    const handleSubmit = useCallback((text?: string) => {
+    const handleSubmit = useCallback(async (text?: string) => {
         const prompt = text || input.trim()
         if (!prompt || isLoading) return
         setInput('')
+
+        // Transition to building phase immediately to prevent UI flicker
+        setPhase('building')
+
+        // Initialize comparison mode if this is the first submission
+        if (!comparisonState) {
+            try {
+                // Look up model and provider labels
+                const provider = providers.find(p => p.id === selectedModelProvider)
+                const model = provider?.models.find(m => m.id === selectedModel)
+                const modelLabel = model?.label || selectedModel
+                const providerLabel = provider?.label || selectedModelProvider
+
+                const res = await fetch('/api/comparison/runs', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        modelId: selectedModel,
+                        modelLabel,
+                        modelProvider: selectedModelProvider,
+                        providerLabel,
+                        prompt,
+                    }),
+                })
+                const data = await res.json()
+                if (data.success && data.state) {
+                    setComparisonState(data.state)
+                }
+            } catch {
+                // Fall back to normal flow if comparison init fails
+            }
+        }
+
         submitMessage(prompt)
-    }, [input, isLoading, submitMessage])
+    }, [input, isLoading, submitMessage, comparisonState, selectedModel, selectedModelProvider, providers])
 
     const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
         if (e.key === 'Enter' && !e.shiftKey) {
@@ -130,9 +286,40 @@ export function CreationView({ initialModel, initialModelProvider, onModelChange
         }
     }, [handleSubmit])
 
-    const handleChipClick = useCallback((fallback: string) => {
-        handleSubmit(fallback)
-    }, [handleSubmit])
+    const handleCategoryClick = useCallback((category: CategoryOption) => {
+        setSelectedCategory(category)
+        setSelectedStyle(null)
+        setContextInput('')
+    }, [])
+
+    const handleStyleClick = useCallback((style: StyleOption) => {
+        // Show context input step for all categories
+        setSelectedStyle(style)
+        setTimeout(() => contextInputRef.current?.focus(), 100)
+    }, [])
+
+    const handleContextSubmit = useCallback(() => {
+        if (!selectedStyle || !contextInput.trim()) return
+        const context = contextInput.trim()
+        // Build the full prompt with user's context (prompt is already localized via i18n)
+        const basePrompt = t(selectedStyle.promptKey)
+        const prompt = basePrompt.replace('{{context}}', context)
+        setSelectedCategory(null)
+        setSelectedStyle(null)
+        setContextInput('')
+        handleSubmit(prompt)
+    }, [selectedStyle, contextInput, handleSubmit, t])
+
+    const handleBackToCategories = useCallback(() => {
+        setSelectedCategory(null)
+        setSelectedStyle(null)
+        setContextInput('')
+    }, [])
+
+    const handleBackToStyles = useCallback(() => {
+        setSelectedStyle(null)
+        setContextInput('')
+    }, [])
 
     const handleToggleTheme = () => {
         setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')
@@ -242,24 +429,111 @@ export function CreationView({ initialModel, initialModelProvider, onModelChange
                     <div className="flex-1 flex flex-col items-center justify-center w-full max-w-2xl px-6">
                         <div className="text-center mb-8 space-y-3">
                             <h1 className="text-3xl font-semibold text-foreground tracking-tight">
-                                {t('creationHeading', 'What would you like to build?')}
+                                {selectedStyle
+                                    ? (selectedCategory?.labelKey === 'creationChipSaaS'
+                                        ? t('creationSaasQuestion', 'What does your product do?')
+                                        : selectedCategory?.labelKey === 'creationChipAgency'
+                                            ? t('creationAgencyQuestion', 'What do you create?')
+                                            : selectedCategory?.labelKey === 'creationChipProduct'
+                                                ? t('creationProductQuestion', 'What are you selling?')
+                                                : t('creationLocalQuestion', 'What type of establishment?'))
+                                    : selectedCategory
+                                        ? t('creationChooseStyle', 'Choose a design style')
+                                        : t('creationHeading', 'What would you like to build?')
+                                }
                             </h1>
                             <p className="text-sm text-muted-foreground">
-                                {t('creationSubheading', 'Describe your app and Awel will create it for you.')}
+                                {selectedStyle
+                                    ? `${t(selectedStyle.nameKey)} · ${selectedCategory?.icon} ${t(selectedCategory?.labelKey || '', selectedCategory?.fallback)}`
+                                    : selectedCategory
+                                        ? `${selectedCategory.icon} ${t(selectedCategory.labelKey, selectedCategory.fallback)}`
+                                        : t('creationSubheading', 'Describe your app and Awel will create it for you.')
+                                }
                             </p>
                         </div>
 
-                        <div className="flex flex-wrap justify-center gap-2 mb-8">
-                            {SUGGESTION_CHIPS.map((chip) => (
+                        {/* Category selection */}
+                        {!selectedCategory && (
+                            <div className="grid grid-cols-2 gap-3 mb-8 w-full max-w-md">
+                                {CREATION_CATEGORIES.map((category) => (
+                                    <button
+                                        key={category.labelKey}
+                                        onClick={() => handleCategoryClick(category)}
+                                        className="flex flex-col items-center gap-2 px-4 py-4 rounded-xl border border-border bg-card hover:bg-accent hover:border-ring transition-colors text-center"
+                                    >
+                                        <span className="text-2xl">{category.icon}</span>
+                                        <span className="text-sm font-medium text-foreground">
+                                            {t(category.labelKey, category.fallback)}
+                                        </span>
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+
+                        {/* Style selection */}
+                        {selectedCategory && !selectedStyle && (
+                            <div className="w-full max-w-lg mb-8 space-y-3">
+                                {selectedCategory.styles.map((style, index) => (
+                                    <button
+                                        key={index}
+                                        onClick={() => handleStyleClick(style)}
+                                        className="w-full text-left px-4 py-4 rounded-xl border border-border bg-card hover:bg-accent hover:border-ring transition-colors"
+                                    >
+                                        <div className="font-medium text-foreground mb-1">{t(style.nameKey)}</div>
+                                        <div className="text-xs text-muted-foreground">{t(style.descKey)}</div>
+                                    </button>
+                                ))}
                                 <button
-                                    key={chip.labelKey}
-                                    onClick={() => handleChipClick(t(chip.labelKey, chip.fallback))}
-                                    className="px-4 py-2 text-sm rounded-full border border-border bg-card hover:bg-accent hover:text-accent-foreground transition-colors text-muted-foreground"
+                                    onClick={handleBackToCategories}
+                                    className="w-full text-center px-4 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
                                 >
-                                    {t(chip.labelKey, chip.fallback)}
+                                    ← {t('creationBackToCategories', 'Back to categories')}
                                 </button>
-                            ))}
-                        </div>
+                            </div>
+                        )}
+
+                        {/* Context input for Product/Local */}
+                        {selectedStyle && (
+                            <div className="w-full max-w-lg mb-8 space-y-4">
+                                <input
+                                    ref={contextInputRef}
+                                    type="text"
+                                    value={contextInput}
+                                    onChange={(e) => setContextInput(e.target.value)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                            e.preventDefault()
+                                            handleContextSubmit()
+                                        }
+                                    }}
+                                    placeholder={
+                                        selectedCategory?.labelKey === 'creationChipSaaS'
+                                            ? t('creationSaasPlaceholder', 'e.g. Project management for remote teams, AI writing assistant...')
+                                            : selectedCategory?.labelKey === 'creationChipAgency'
+                                                ? t('creationAgencyPlaceholder', 'e.g. Brand identity design, Product photography, Motion graphics...')
+                                                : selectedCategory?.labelKey === 'creationChipProduct'
+                                                    ? t('creationProductPlaceholder', 'e.g. Wireless earbuds, Artisan candles, Fitness app...')
+                                                    : t('creationLocalPlaceholder', 'e.g. Italian trattoria, Craft coffee roaster, Ramen bar...')
+                                    }
+                                    className="w-full px-4 py-3 text-sm bg-card border border-border rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/50 focus:border-ring"
+                                />
+                                <div className="flex gap-2">
+                                    <button
+                                        onClick={handleBackToStyles}
+                                        className="flex-1 px-4 py-2.5 text-sm text-muted-foreground hover:text-foreground border border-border rounded-xl hover:bg-accent transition-colors"
+                                    >
+                                        ← {t('creationBackToStyles', 'Back')}
+                                    </button>
+                                    <button
+                                        onClick={handleContextSubmit}
+                                        disabled={!contextInput.trim()}
+                                        className="flex-1 px-4 py-2.5 text-sm bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        {t('creationStart', 'Start Building')} →
+                                    </button>
+                                </div>
+                            </div>
+                        )}
 
                         <div className="w-full">
                             <div className="flex gap-2 items-end">

@@ -10,6 +10,8 @@ export interface ProviderConfig {
     signal?: AbortSignal;
     /** When true, the agent uses a creation-mode system prompt for building new apps. */
     creationMode?: boolean;
+    /** User's preferred language (e.g., 'en', 'zh'). Used to select localized system prompts. */
+    language?: string;
 }
 
 export interface StreamProvider {

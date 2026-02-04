@@ -1,5 +1,5 @@
 import { program } from 'commander';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, appendFileSync } from 'node:fs';
 import { resolve, join } from 'node:path';
 import open from 'open';
 import { startServer } from './server.js';
@@ -118,6 +118,16 @@ program
 
         p.intro('Create a new project with Awel');
 
+        // Check if git is installed (required for comparison mode)
+        try {
+            await execa('git', ['--version']);
+        } catch {
+            p.log.error('Git is not installed. Git is required for Awel to track changes and compare models.');
+            p.log.info('Please install Git: https://git-scm.com/downloads');
+            p.outro('');
+            process.exit(1);
+        }
+
         const name = await p.text({
             message: 'Project name',
             placeholder: 'my-app',
@@ -152,6 +162,26 @@ program
         s.stop('Project created');
 
         const projectDir = resolve(process.cwd(), name);
+
+        // Add .awel to .gitignore and commit it (if git is initialized)
+        const gitignorePath = join(projectDir, '.gitignore');
+        const hasGit = existsSync(join(projectDir, '.git'));
+        if (existsSync(gitignorePath)) {
+            const gitignore = readFileSync(gitignorePath, 'utf-8');
+            if (!gitignore.includes('.awel')) {
+                appendFileSync(gitignorePath, '\n# Awel\n.awel\n');
+                // Commit the change so it persists across comparison branches
+                if (hasGit) {
+                    try {
+                        await execa('git', ['add', '.gitignore'], { cwd: projectDir });
+                        await execa('git', ['commit', '-m', 'Add .awel to .gitignore'], { cwd: projectDir });
+                    } catch {
+                        // Git command failed - skip commit
+                    }
+                }
+            }
+        }
+
         writeAwelConfig(projectDir, { fresh: true, createdAt: new Date().toISOString() });
 
         p.outro(`Done! Now run:\n\n  cd ${name}\n  npx awel dev`);

@@ -9,7 +9,7 @@
  * The port is configured to match the AWEL_PORT in packages/cli/src/config.ts
  */
 
-import { SIDEBAR_STATE_KEY, setResolvedTheme } from './state.js';
+import { SIDEBAR_STATE_KEY, DASHBOARD_URL, setResolvedTheme } from './state.js';
 import {
   consoleEntries,
   consoleHasUnviewed,
@@ -45,11 +45,62 @@ import {
 import { startScreenshotAnnotation } from './annotation.js';
 import { setupPageContextTracking, broadcastPageContext } from './pageContext.js';
 
+// ─── Comparison Mode ───────────────────────────────────────────
+
+function isComparisonMode(): boolean {
+  return !!(window as any).__AWEL_COMPARISON_MODE__;
+}
+
+function createComparisonOverlay(): void {
+  if (document.getElementById('awel-comparison-overlay')) return;
+
+  if (!document.getElementById('awel-comparison-styles')) {
+    const style = document.createElement('style');
+    style.id = 'awel-comparison-styles';
+    style.textContent = `
+      #awel-comparison-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 999999;
+        pointer-events: none;
+      }
+      #awel-comparison-overlay iframe {
+        width: 100%;
+        height: 100%;
+        border: none;
+        pointer-events: auto;
+        background: transparent;
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  const overlay = document.createElement('div');
+  overlay.id = 'awel-comparison-overlay';
+
+  const iframe = document.createElement('iframe');
+  // Pass comparison mode via URL parameter since the iframe has its own window
+  iframe.src = DASHBOARD_URL + '?mode=comparison';
+
+  overlay.appendChild(iframe);
+  document.documentElement.appendChild(overlay);
+}
+
+function closeComparisonOverlay(): void {
+  document.getElementById('awel-comparison-overlay')?.remove();
+}
+
+function updateComparisonTheme(theme: 'light' | 'dark'): void {
+  const iframe = document.querySelector('#awel-comparison-overlay iframe') as HTMLIFrameElement | null;
+  iframe?.contentWindow?.postMessage({ type: 'AWEL_THEME', theme }, '*');
+}
+
 // ─── Message Handler ──────────────────────────────────────────
 
 window.addEventListener('message', (event) => {
   if (event.data?.type === 'AWEL_CLOSE') {
     closeOverlay();
+    closeComparisonOverlay();
   }
   if (event.data?.type === 'AWEL_HIGHLIGHT_ELEMENT') {
     showHoverHighlight();
@@ -65,7 +116,7 @@ window.addEventListener('message', (event) => {
     const comment = event.data.comment as string;
     const payloadWithComment = { ...pendingInspectorPayload, comment };
 
-    // Open sidebar if not already open
+    // Open sidebar if not already open (normal mode)
     if (!isSidebarVisible()) {
       openOverlay();
     }
@@ -100,10 +151,14 @@ window.addEventListener('message', (event) => {
   if (event.data?.type === 'AWEL_HIDE_CONTROLS') {
     const hostEl = document.getElementById('awel-host');
     if (hostEl) hostEl.style.display = 'none';
+    const comparisonOverlay = document.getElementById('awel-comparison-overlay');
+    if (comparisonOverlay) comparisonOverlay.style.display = 'none';
   }
   if (event.data?.type === 'AWEL_SHOW_CONTROLS') {
     const hostEl = document.getElementById('awel-host');
     if (hostEl) hostEl.style.display = '';
+    const comparisonOverlay = document.getElementById('awel-comparison-overlay');
+    if (comparisonOverlay) comparisonOverlay.style.display = '';
   }
   if (event.data?.type === 'AWEL_INSPECT_FOR_ATTACH') {
     setInspectorAttachMode(true);
@@ -114,6 +169,7 @@ window.addEventListener('message', (event) => {
   }
   if (event.data?.type === 'AWEL_THEME') {
     setResolvedTheme(event.data.theme);
+    updateComparisonTheme(event.data.theme);
   }
 });
 
@@ -122,6 +178,13 @@ window.addEventListener('message', (event) => {
 function init(): void {
   setupConsoleInterception();
   setupPageContextTracking();
+
+  // In comparison mode, show the comparison overlay instead of the normal trigger button
+  if (isComparisonMode()) {
+    createComparisonOverlay();
+    return;
+  }
+
   createTriggerButton({
     onInspectorToggle: () => setInspectorActive(!getInspectorActive()),
     onScreenshot: () => startScreenshotAnnotation(),
@@ -147,6 +210,14 @@ function init(): void {
 
 function setupSelfHealing(): void {
   const observer = new MutationObserver(() => {
+    // In comparison mode, heal the comparison overlay
+    if (isComparisonMode()) {
+      if (!document.getElementById('awel-comparison-overlay')) {
+        createComparisonOverlay();
+      }
+      return;
+    }
+
     if (!document.getElementById('awel-host')) {
       // Trigger button was removed — re-create it
       createTriggerButton({

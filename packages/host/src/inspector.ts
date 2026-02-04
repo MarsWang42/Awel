@@ -729,19 +729,29 @@ export function hideHoverHighlight(): void {
 
 // ─── Core: setInspectorActive ─────────────────────────────────
 
+let comparisonOverlayWasVisible = false;
+
 export function setInspectorActive(active: boolean): void {
   inspectorActive = active;
 
   const hostEl = document.getElementById('awel-host');
   const sidebarEl = document.getElementById('awel-sidebar');
+  const comparisonHostEl = document.getElementById('awel-comparison-host');
+  const comparisonOverlayEl = document.getElementById('awel-comparison-overlay');
 
   if (active) {
-    // Remember whether sidebar was open so we can restore it
+    // Remember whether sidebar/overlay was open so we can restore it
     sidebarWasOpen = isSidebarVisible();
+    comparisonOverlayWasVisible = !!(comparisonOverlayEl && comparisonOverlayEl.style.display !== 'none' && comparisonOverlayEl.classList.contains('visible'));
 
     // Hide Awel UI so user can click any element
     if (hostEl) hostEl.style.display = 'none';
     if (sidebarEl) sidebarEl.style.display = 'none';
+    if (comparisonHostEl) comparisonHostEl.style.display = 'none';
+    if (comparisonOverlayEl) {
+      comparisonOverlayEl.classList.remove('visible');
+      comparisonOverlayEl.style.display = 'none';
+    }
 
     showInspectorToast();
 
@@ -754,6 +764,15 @@ export function setInspectorActive(active: boolean): void {
     // Show Awel UI again
     if (hostEl) hostEl.style.display = '';
     if (sidebarEl && sidebarWasOpen) sidebarEl.style.display = '';
+    if (comparisonHostEl) comparisonHostEl.style.display = '';
+    if (comparisonOverlayEl && comparisonOverlayWasVisible) {
+      comparisonOverlayEl.style.display = '';
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          comparisonOverlayEl.classList.add('visible');
+        });
+      });
+    }
 
     document.body.style.cursor = '';
     document.removeEventListener('mousemove', handleInspectorMove, true);
