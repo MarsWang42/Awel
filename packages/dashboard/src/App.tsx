@@ -9,6 +9,7 @@ import { DiffModal, type FileDiff } from './components/DiffModal'
 import { CreationView } from './components/CreationView'
 import { ComparisonView } from './components/ComparisonView'
 import { useTheme } from './hooks/useTheme'
+import { cn } from './lib/utils'
 
 const IS_CREATION_MODE = !!(window as any).__AWEL_CREATION_MODE__
 const IS_COMPARISON_MODE = !!(window as any).__AWEL_COMPARISON_MODE__ ||
@@ -107,9 +108,10 @@ function App() {
         <div className="fixed inset-0" onClick={handleBackdropClick}>
             {/* Panel */}
             <div
-                className={`absolute top-6 right-6 bottom-20 bg-background rounded-xl shadow-2xl flex flex-col overflow-hidden border border-border transition-[width] duration-200 ease-out ${
-                    expanded ? 'w-[calc(100%-3rem)]' : 'w-[380px]'
-                }`}
+                className={cn(
+                    "absolute top-6 right-6 bottom-20 bg-background rounded-xl shadow-2xl flex flex-col overflow-hidden border border-border transition-[width] duration-200 ease-out",
+                    expanded ? "w-[calc(100%-3rem)]" : "w-[380px]"
+                )}
                 onClick={e => e.stopPropagation()}
             >
                 {/* Header */}

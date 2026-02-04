@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import { XCircle, AlertTriangle } from 'lucide-react'
+import { cn } from '../../lib/utils'
 import type { ConsoleEntry, SelectedElement, ContentSegment } from '../../types/messages'
 
 interface UserMessageProps {
@@ -50,9 +51,10 @@ export function UserMessage({
                             key={i}
                             src={url}
                             alt={t('attachedAlt', { index: i + 1 })}
-                            className={`max-w-[200px] max-h-[200px] rounded-lg border border-border/50 object-cover ${
-                                onImageClick ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''
-                            }`}
+                            className={cn(
+                                "max-w-[200px] max-h-[200px] rounded-lg border border-border/50 object-cover",
+                                onImageClick && "cursor-pointer hover:opacity-80 transition-opacity"
+                            )}
                             onClick={onImageClick ? () => onImageClick(allImages, i) : undefined}
                         />
                     ))}
@@ -65,11 +67,12 @@ export function UserMessage({
                             key={entry.id}
                             type="button"
                             onClick={() => onConsoleEntryClick?.(entry)}
-                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium transition-colors ${
+                            className={cn(
+                                "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium transition-colors",
                                 entry.level === 'error'
-                                    ? 'bg-red-100 text-red-800 hover:bg-red-200 dark:bg-red-800/80 dark:text-red-100 dark:hover:bg-red-700/80'
-                                    : 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200 dark:bg-yellow-800/80 dark:text-yellow-100 dark:hover:bg-yellow-700/80'
-                            }`}
+                                    ? "bg-red-100 text-red-800 hover:bg-red-200 dark:bg-red-800/80 dark:text-red-100 dark:hover:bg-red-700/80"
+                                    : "bg-yellow-100 text-yellow-800 hover:bg-yellow-200 dark:bg-yellow-800/80 dark:text-yellow-100 dark:hover:bg-yellow-700/80"
+                            )}
                             title={t('clickToReattach', { level: entry.level })}
                         >
                             {entry.level === 'error'

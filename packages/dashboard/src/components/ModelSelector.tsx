@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { ChevronsUpDown, ChevronDown, Lock, X, Copy, Check } from 'lucide-react'
 import { Tooltip } from './ui/tooltip'
 import { ConfirmDialog } from './ui/confirm-dialog'
+import { cn } from '../lib/utils'
 
 interface ModelEntry {
     id: string
@@ -260,19 +261,20 @@ export const ModelSelector = forwardRef<ModelSelectorHandle, ModelSelectorProps>
                 }
             }}
             disabled={disabled}
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-xs transition-colors max-w-[10rem] ${
+            className={cn(
+                "flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-xs transition-colors max-w-[10rem]",
                 disabled
-                    ? 'bg-muted/50 border-muted/50 cursor-default text-muted-foreground'
-                    : 'bg-muted/80 hover:bg-accent/80 border-border/50 text-foreground'
-            }`}
+                    ? "bg-muted/50 border-muted/50 cursor-default text-muted-foreground"
+                    : "bg-muted/80 hover:bg-accent/80 border-border/50 text-foreground"
+            )}
         >
             {selectedDef && (
-                <span className={`truncate ${selectedDef.color}`}>
+                <span className={cn("truncate", selectedDef.color)}>
                     {selectedDef.label}
                 </span>
             )}
             {isCustomOpenRouterModel && (
-                <span className={`truncate ${providers.find(p => p.id === 'openrouter')?.color ?? ''}`}>
+                <span className={cn("truncate", providers.find(p => p.id === 'openrouter')?.color)}>
                     {selectedModel}
                 </span>
             )}
@@ -331,18 +333,19 @@ export const ModelSelector = forwardRef<ModelSelectorHandle, ModelSelectorProps>
                         <div className="overflow-y-auto flex-1">
                             {filteredProviders.map(provider => (
                                 <div key={provider.id}>
-                                    <div className={`px-4 py-1.5 text-[10px] font-medium uppercase tracking-wider bg-card/50 sticky top-0 ${provider.color || 'text-muted-foreground'}`}>
+                                    <div className={cn("px-4 py-1.5 text-[10px] font-medium uppercase tracking-wider bg-card/50 sticky top-0", provider.color || "text-muted-foreground")}>
                                         {provider.label}
                                     </div>
                                     {provider.models.map(m => (
                                         <button
                                             key={m.id}
                                             onClick={() => handleModelSelect(m.id, provider.id)}
-                                            className={`w-full text-left px-4 py-2 text-xs transition-colors ${
+                                            className={cn(
+                                                "w-full text-left px-4 py-2 text-xs transition-colors",
                                                 m.id === selectedModel && provider.id === selectedModelProvider
-                                                    ? 'bg-muted text-foreground'
-                                                    : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
-                                            }`}
+                                                    ? "bg-muted text-foreground"
+                                                    : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                                            )}
                                         >
                                             <span className={provider.color}>{m.label}</span>
                                             {m.id === selectedModel && provider.id === selectedModelProvider && (
@@ -356,7 +359,7 @@ export const ModelSelector = forwardRef<ModelSelectorHandle, ModelSelectorProps>
                             {/* Custom OpenRouter model input */}
                             {showCustomModelSection && (
                                 <div>
-                                    <div className={`px-4 py-1.5 text-[10px] font-medium uppercase tracking-wider bg-card/50 sticky top-0 ${openRouterProvider?.color ?? ''}`}>
+                                    <div className={cn("px-4 py-1.5 text-[10px] font-medium uppercase tracking-wider bg-card/50 sticky top-0", openRouterProvider?.color)}>
                                         {openRouterProvider?.label ?? 'OpenRouter'}
                                     </div>
                                     <div className="px-4 py-2.5 space-y-2">
@@ -372,11 +375,12 @@ export const ModelSelector = forwardRef<ModelSelectorHandle, ModelSelectorProps>
                                             <button
                                                 onClick={handleUseCustomModel}
                                                 disabled={!customModelInput.trim()}
-                                                className={`text-xs px-3 py-1.5 rounded-md transition-colors font-medium ${
+                                                className={cn(
+                                                    "text-xs px-3 py-1.5 rounded-md transition-colors font-medium",
                                                     customModelInput.trim()
-                                                        ? 'bg-teal-600 hover:bg-teal-700 text-white'
-                                                        : 'bg-muted text-muted-foreground cursor-not-allowed'
-                                                }`}
+                                                        ? "bg-teal-600 hover:bg-teal-700 text-white"
+                                                        : "bg-muted text-muted-foreground cursor-not-allowed"
+                                                )}
                                             >
                                                 {t('useModel', 'Use')}
                                             </button>
@@ -391,11 +395,12 @@ export const ModelSelector = forwardRef<ModelSelectorHandle, ModelSelectorProps>
                                                             setRecentCustomModels(updated)
                                                             handleModelSelect(modelId, 'openrouter')
                                                         }}
-                                                        className={`text-[10px] px-2 py-0.5 rounded-full border transition-colors ${
+                                                        className={cn(
+                                                            "text-[10px] px-2 py-0.5 rounded-full border transition-colors",
                                                             modelId === selectedModel && selectedModelProvider === 'openrouter'
-                                                                ? 'border-teal-500 bg-teal-500/10 text-teal-600 dark:text-teal-400'
-                                                                : 'border-border bg-muted/50 text-muted-foreground hover:text-foreground hover:bg-muted'
-                                                        }`}
+                                                                ? "border-teal-500 bg-teal-500/10 text-teal-600 dark:text-teal-400"
+                                                                : "border-border bg-muted/50 text-muted-foreground hover:text-foreground hover:bg-muted"
+                                                        )}
                                                     >
                                                         {modelId}
                                                     </button>

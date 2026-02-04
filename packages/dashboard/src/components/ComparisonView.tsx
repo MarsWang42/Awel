@@ -5,6 +5,7 @@ import { Button } from './ui/button'
 import { Console } from './Console'
 import { DiffModal, type FileDiff } from './DiffModal'
 import { useTheme } from '../hooks/useTheme'
+import { cn } from '../lib/utils'
 import type { ConsoleEntry } from '../types/messages'
 
 interface ComparisonRun {
@@ -51,7 +52,6 @@ export function ComparisonView() {
     const [providers, setProviders] = useState<ProviderEntry[]>([])
     const [isLoading, setIsLoading] = useState(false)
     const [reviewDiffs, setReviewDiffs] = useState<FileDiff[] | null>(null)
-    const [chatKey, setChatKey] = useState(0)
     const [consoleEntries, setConsoleEntries] = useState<ConsoleEntry[]>([])
 
     // Get active run's model info for chat
@@ -214,23 +214,6 @@ export function ComparisonView() {
         setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')
     }, [resolvedTheme, setTheme])
 
-    const handleConsoleEntryClick = useCallback((entry: ConsoleEntry) => {
-        // Open chat and let the user discuss the error
-        setIsChatOpen(true)
-        setIsCollapsed(true)
-        window.parent.postMessage({ type: 'AWEL_COMPARISON_EXPAND' }, '*')
-    }, [])
-
-    const dismissConsoleEntry = useCallback((id: string) => {
-        setConsoleEntries(prev => prev.filter(e => e.id !== id))
-        window.parent.postMessage({ type: 'AWEL_CONSOLE_DISMISS', id }, '*')
-    }, [])
-
-    const clearConsoleEntries = useCallback(() => {
-        setConsoleEntries([])
-        window.parent.postMessage({ type: 'AWEL_CONSOLE_CLEAR' }, '*')
-    }, [])
-
     // Don't render if not in comparison mode
     if (!comparisonState || comparisonState.phase !== 'comparing') {
         return null
@@ -260,71 +243,53 @@ export function ComparisonView() {
         }))
     )
 
-    // Collapsed/trigger buttons view
-    if (isCollapsed && !isChatOpen) {
-        return (
-            <div className="fixed bottom-6 right-6 z-[999998] flex items-center gap-1 ">
-                <button
-                    onClick={() => setIsCollapsed(false)}
-                    className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-background shadow-[0_4px_12px_rgba(0,0,0,0.1)] dark:shadow-[0_4px_12px_rgba(0,0,0,0.4)] text-[13px] font-medium text-foreground hover:bg-accent transition-all active:scale-[0.98]"
-                >
-                    <span className="text-sm leading-none">🌸</span>
-                    <span>{t('comparisonTitle')}</span>
-                </button>
-                <button
-                    onClick={handleSelectRun}
-                    disabled={!canUseVersion}
-                    className="px-4 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white shadow-[0_4px_12px_rgba(0,0,0,0.1)] dark:shadow-[0_4px_12px_rgba(0,0,0,0.4)] text-[13px] font-medium transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                    {t('comparisonUseThis')}
-                </button>
-            </div>
-        )
-    }
+    // Unified view with CSS transitions
+    return (
+        <>
+            {/* Floating chat panel - always in DOM, animated */}
+            <div className={cn(
+                "fixed top-6 right-6 bottom-20 w-[380px] z-[999999] bg-background rounded-xl shadow-2xl flex flex-col overflow-hidden border border-border transition-all duration-200 ease-out origin-bottom-right",
+                isChatOpen
+                    ? "opacity-100 scale-100 translate-y-0"
+                    : "opacity-0 scale-95 translate-y-4 pointer-events-none"
+            )}>
+                {/* Header */}
+                <header className="flex items-center justify-between px-4 py-2.5 border-b border-border shrink-0">
+                    <div className="flex items-center gap-2">
+                        <span className="text-sm leading-none">🌸</span>
+                        <span className="text-sm font-semibold text-foreground">Awel</span>
+                        {isLoading && (
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                        )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={handleToggleTheme}
+                            className="h-7 w-7 hover:bg-muted"
+                            title={t('toggleTheme')}
+                        >
+                            {resolvedTheme === 'dark'
+                                ? <Sun className="w-3.5 h-3.5" />
+                                : <Moon className="w-3.5 h-3.5" />
+                            }
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={handleCloseChat}
+                            className="h-7 px-2 hover:bg-muted text-xs"
+                        >
+                            <Minimize2 className="w-3.5 h-3.5 mr-1" />
+                            {t('collapse')}
+                        </Button>
+                    </div>
+                </header>
 
-    // Floating chat panel (similar to normal sidebar)
-    if (isChatOpen) {
-        return (
-            <>
-                {/* Floating chat panel */}
-                <div className="fixed top-6 right-6 bottom-20 w-[380px] z-[999999] bg-background rounded-xl shadow-2xl flex flex-col overflow-hidden border border-border ">
-                    {/* Header */}
-                    <header className="flex items-center justify-between px-4 py-2.5 border-b border-border shrink-0">
-                        <div className="flex items-center gap-2">
-                            <span className="text-sm leading-none">🌸</span>
-                            <span className="text-sm font-semibold text-foreground">Awel</span>
-                            {isLoading && (
-                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                            )}
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={handleToggleTheme}
-                                className="h-7 w-7 hover:bg-muted"
-                                title={t('toggleTheme')}
-                            >
-                                {resolvedTheme === 'dark'
-                                    ? <Sun className="w-3.5 h-3.5" />
-                                    : <Moon className="w-3.5 h-3.5" />
-                                }
-                            </Button>
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={handleCloseChat}
-                                className="h-7 px-2 hover:bg-muted text-xs"
-                            >
-                                <Minimize2 className="w-3.5 h-3.5 mr-1" />
-                                {t('collapse')}
-                            </Button>
-                        </div>
-                    </header>
-
-                    {/* Chat content */}
+                {/* Chat content - only render when open to avoid unnecessary work */}
+                {isChatOpen && (
                     <Console
-                        key={chatKey}
                         selectedModel={selectedModel}
                         selectedModelProvider={selectedModelProvider}
                         modelReady={!!selectedModel}
@@ -332,37 +297,17 @@ export function ComparisonView() {
                         onStreamingChange={setIsLoading}
                         onReviewDiffs={handleReviewOpen}
                     />
-                </div>
-
-                {/* Floating buttons at bottom */}
-                <div className="fixed bottom-6 right-6 z-[999998] flex items-center gap-1 ">
-                    <button
-                        onClick={handleCloseChat}
-                        className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-background shadow-[0_4px_12px_rgba(0,0,0,0.1)] dark:shadow-[0_4px_12px_rgba(0,0,0,0.4)] text-[13px] font-medium text-foreground hover:bg-accent transition-all active:scale-[0.98]"
-                    >
-                        <span className="text-sm leading-none">🌸</span>
-                        <span>{t('comparisonTitle')}</span>
-                    </button>
-                    <button
-                        onClick={handleSelectRun}
-                        disabled={!canUseVersion}
-                        className="px-4 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white shadow-[0_4px_12px_rgba(0,0,0,0.1)] dark:shadow-[0_4px_12px_rgba(0,0,0,0.4)] text-[13px] font-medium transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                        {t('comparisonUseThis')}
-                    </button>
-                </div>
-
-                {reviewDiffs && (
-                    <DiffModal diffs={reviewDiffs} onClose={handleReviewClose} />
                 )}
-            </>
-        )
-    }
+            </div>
 
-    // Sidebar card view
-    return (
-        <div className="fixed bottom-6 right-6 z-[999998] ">
-            <div className="bg-background border border-border rounded-xl shadow-lg w-[360px] max-h-[calc(100vh-48px)] flex flex-col animate-in fade-in slide-in-from-bottom-2 duration-200">
+            {/* Sidebar card view - always in DOM, animated */}
+            <div className={cn(
+                "fixed bottom-6 right-6 z-[999998] transition-all duration-200 ease-out origin-bottom-right",
+                !isCollapsed && !isChatOpen
+                    ? "opacity-100 scale-100 translate-y-0"
+                    : "opacity-0 scale-95 translate-y-4 pointer-events-none"
+            )}>
+                <div className="bg-background border border-border rounded-xl shadow-lg w-[360px] max-h-[calc(100vh-48px)] flex flex-col">
                 {/* Header */}
                 <div className="flex items-center justify-between px-3 py-2.5 border-b border-border shrink-0">
                     {modelSelectorOpen ? (
@@ -488,21 +433,22 @@ export function ComparisonView() {
                                     key={run.id}
                                     onClick={() => handleSwitchRun(run.id)}
                                     disabled={isDisabled}
-                                    className={`w-full px-3 py-2.5 rounded-lg transition-colors text-left ${
+                                    className={cn(
+                                        "w-full px-3 py-2.5 rounded-lg transition-colors text-left",
                                         isActive
-                                            ? 'bg-muted border border-primary/50'
-                                            : 'hover:bg-muted/50 border border-transparent'
-                                    } ${isDisabled ? 'opacity-60 cursor-not-allowed' : ''}`}
+                                            ? "bg-muted border border-primary/50"
+                                            : "hover:bg-muted/50 border border-transparent",
+                                        isDisabled && "opacity-60 cursor-not-allowed"
+                                    )}
                                 >
                                     <div className="flex items-center justify-between mb-1">
                                         <span className="text-xs font-medium text-foreground">{run.modelLabel}</span>
-                                        <span className={`text-[10px] font-medium px-2 py-0.5 rounded ${
-                                            run.status === 'success'
-                                                ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
-                                                : run.status === 'failed'
-                                                    ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
-                                                    : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
-                                        }`}>
+                                        <span className={cn(
+                                            "text-[10px] font-medium px-2 py-0.5 rounded",
+                                            run.status === 'success' && "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
+                                            run.status === 'failed' && "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
+                                            run.status === 'building' && "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
+                                        )}>
                                             {run.status === 'building' ? (
                                                 <span className="flex items-center gap-1">
                                                     <Loader2 className="w-2.5 h-2.5 animate-spin" />
@@ -569,7 +515,42 @@ export function ComparisonView() {
                         </button>
                     </div>
                 )}
+                </div>
             </div>
-        </div>
+
+            {/* Floating buttons at bottom - always visible */}
+            <div className="fixed bottom-6 right-6 z-[999997] flex items-center gap-1">
+                <button
+                    onClick={() => {
+                        if (isChatOpen) {
+                            handleCloseChat()
+                        } else {
+                            setIsCollapsed(prev => !prev)
+                        }
+                    }}
+                    className={cn(
+                        "flex items-center gap-2 px-4 py-2.5 rounded-lg bg-background shadow-[0_4px_12px_rgba(0,0,0,0.1)] dark:shadow-[0_4px_12px_rgba(0,0,0,0.4)] text-[13px] font-medium text-foreground hover:bg-accent active:scale-[0.98] transition-all duration-200",
+                        isCollapsed || isChatOpen ? "opacity-100 translate-y-0" : "opacity-0 translate-y-2 pointer-events-none"
+                    )}
+                >
+                    <span className="text-sm leading-none">🌸</span>
+                    <span>{t('comparisonTitle')}</span>
+                </button>
+                <button
+                    onClick={handleSelectRun}
+                    disabled={!canUseVersion}
+                    className={cn(
+                        "px-4 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white shadow-[0_4px_12px_rgba(0,0,0,0.1)] dark:shadow-[0_4px_12px_rgba(0,0,0,0.4)] text-[13px] font-medium active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200",
+                        isCollapsed || isChatOpen ? "opacity-100 translate-y-0" : "opacity-0 translate-y-2 pointer-events-none"
+                    )}
+                >
+                    {t('comparisonUseThis')}
+                </button>
+            </div>
+
+            {reviewDiffs && (
+                <DiffModal diffs={reviewDiffs} onClose={handleReviewClose} />
+            )}
+        </>
     )
 }

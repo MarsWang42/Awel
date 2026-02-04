@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
 import { Wrench, FileText, Edit, Terminal, Search, FolderTree, List } from 'lucide-react'
+import { cn } from '../../lib/utils'
 
 interface ToolUseMessageProps {
     toolName: string
@@ -18,21 +19,23 @@ const TOOL_ICONS: Record<string, typeof Wrench> = {
 }
 
 // Tool-specific colors
-const TOOL_COLORS: Record<string, string> = {
-    Read: 'text-blue-400 border-blue-500/50',
-    Write: 'text-foreground border-border/50',
-    Edit: 'text-foreground border-border/50',
-    Bash: 'text-purple-400 border-purple-500/50',
-    Grep: 'text-orange-400 border-orange-500/50',
-    Glob: 'text-cyan-400 border-cyan-500/50',
-    Ls: 'text-cyan-400 border-cyan-500/50',
+const TOOL_COLORS: Record<string, { text: string; border: string }> = {
+    Read: { text: 'text-blue-400', border: 'border-blue-500/50' },
+    Write: { text: 'text-foreground', border: 'border-border/50' },
+    Edit: { text: 'text-foreground', border: 'border-border/50' },
+    Bash: { text: 'text-purple-400', border: 'border-purple-500/50' },
+    Grep: { text: 'text-orange-400', border: 'border-orange-500/50' },
+    Glob: { text: 'text-cyan-400', border: 'border-cyan-500/50' },
+    Ls: { text: 'text-cyan-400', border: 'border-cyan-500/50' },
 }
+
+const DEFAULT_COLORS = { text: 'text-amber-400', border: 'border-amber-500/50' }
 
 export function ToolUseMessage({ toolName, input }: ToolUseMessageProps) {
     const [expanded, setExpanded] = useState(false)
 
     const Icon = TOOL_ICONS[toolName] || Wrench
-    const colorClass = TOOL_COLORS[toolName] || 'text-amber-400 border-amber-500/50'
+    const colors = TOOL_COLORS[toolName] || DEFAULT_COLORS
 
     // Create a preview of the input based on tool type
     const preview = useMemo(() => {
@@ -72,9 +75,9 @@ export function ToolUseMessage({ toolName, input }: ToolUseMessageProps) {
         : preview
 
     return (
-        <div className={`border-l-2 ${colorClass.split(' ')[1]} pl-3 py-1.5 my-1`}>
+        <div className={cn("border-l-2 pl-3 py-1.5 my-1", colors.border)}>
             <div
-                className={`flex items-center gap-2 text-xs cursor-pointer transition-colors ${colorClass.split(' ')[0]} hover:brightness-125`}
+                className={cn("flex items-center gap-2 text-xs cursor-pointer transition-colors hover:brightness-125", colors.text)}
                 onClick={() => setExpanded(!expanded)}
             >
                 <Icon className="w-3.5 h-3.5" />

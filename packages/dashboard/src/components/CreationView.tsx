@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Send, Loader2, Square, Sparkles } from 'lucide-react'
+import { Send, Loader2, Square, Sparkles, Sun, Moon } from 'lucide-react'
 import { Button } from './ui/button'
 import { ModelSelector, type ModelSelectorHandle } from './ModelSelector'
 import { useConsole } from '../hooks/useConsole'
 import { useTheme } from '../hooks/useTheme'
-import { Sun, Moon } from 'lucide-react'
+import { cn } from '../lib/utils'
 
 interface ProviderEntry {
     id: string
@@ -413,7 +413,7 @@ export function CreationView({ initialModel, initialModelProvider, onModelChange
                         <div className="w-full space-y-4">
                             {providers.filter(p => p.available && p.models.length > 0).map(provider => (
                                 <div key={provider.id}>
-                                    <div className={`text-[10px] font-medium uppercase tracking-wider mb-1.5 px-1 ${provider.color || 'text-muted-foreground'}`}>
+                                    <div className={cn("text-[10px] font-medium uppercase tracking-wider mb-1.5 px-1", provider.color || "text-muted-foreground")}>
                                         {provider.label}
                                     </div>
                                     <div className="grid grid-cols-2 gap-2">
@@ -594,9 +594,10 @@ export function CreationView({ initialModel, initialModelProvider, onModelChange
                                         onKeyDown={handleKeyDown}
                                         placeholder={t('inputPlaceholder')}
                                         disabled={isLoading && !waitingForInput}
-                                        className={`w-full px-4 py-2 text-sm bg-transparent text-foreground placeholder:text-muted-foreground focus:outline-none resize-none ${
-                                            isLoading && !waitingForInput ? 'opacity-50 cursor-not-allowed' : ''
-                                        }`}
+                                        className={cn(
+                                            "w-full px-4 py-2 text-sm bg-transparent text-foreground placeholder:text-muted-foreground focus:outline-none resize-none",
+                                            isLoading && !waitingForInput && "opacity-50 cursor-not-allowed"
+                                        )}
                                         rows={1}
                                         style={{ minHeight: '36px', maxHeight: '120px' }}
                                     />

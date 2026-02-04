@@ -1,5 +1,6 @@
 import { useEffect, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
+import { cn } from '../../lib/utils'
 
 interface ConfirmDialogProps {
     title: string
@@ -53,7 +54,7 @@ export function ConfirmDialog({
                     </button>
                     <button
                         onClick={onConfirm}
-                        className={`text-xs px-3 py-1.5 rounded transition-colors ${confirmClasses}`}
+                        className={cn("text-xs px-3 py-1.5 rounded transition-colors", confirmClasses)}
                     >
                         {resolvedConfirmLabel}
                     </button>

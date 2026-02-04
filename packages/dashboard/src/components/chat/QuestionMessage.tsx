@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { cn } from '../../lib/utils'
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '../ui/card'
 
 export interface QuestionOption {
@@ -84,7 +85,7 @@ export function QuestionMessage({ questionId, questions, onAnswer, disabled, ans
     }
 
     return (
-        <Card className={`border-violet-700/50 bg-card/80 ${inactive ? 'opacity-80' : ''}`}>
+        <Card className={cn("border-violet-700/50 bg-card/80", inactive && "opacity-80")}>
             <CardHeader className="p-3 pb-1">
                 <CardTitle className="text-sm font-medium text-violet-400 flex items-center gap-2">
                     <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -105,11 +106,12 @@ export function QuestionMessage({ questionId, questions, onAnswer, disabled, ans
                                 key={idx}
                                 type="button"
                                 onClick={() => setActiveTab(idx)}
-                                className={`relative px-2.5 py-1.5 text-xs font-medium transition-colors flex items-center gap-1.5 ${
+                                className={cn(
+                                    "relative px-2.5 py-1.5 text-xs font-medium transition-colors flex items-center gap-1.5",
                                     isActive
-                                        ? 'text-violet-300 border-b-2 border-violet-500'
-                                        : 'text-muted-foreground hover:text-foreground'
-                                }`}
+                                        ? "text-violet-300 border-b-2 border-violet-500"
+                                        : "text-muted-foreground hover:text-foreground"
+                                )}
                             >
                                 {tab.header}
                                 {hasSelection && (
@@ -148,25 +150,21 @@ export function QuestionMessage({ questionId, questions, onAnswer, disabled, ans
                                     type="button"
                                     disabled={inactive}
                                     onClick={() => handleToggle(qIdx, optIdx, q.multiSelect)}
-                                    className={`w-full text-left rounded-md border px-3 py-2 transition-colors ${
-                                        inactive
-                                            ? isSelected
-                                                ? 'border-violet-600/60 bg-violet-950/40'
-                                                : 'border-border bg-card/50 opacity-50'
-                                            : isSelected
-                                                ? 'border-violet-500/70 bg-violet-950/50'
-                                                : 'border-border/50 bg-muted/40 hover:border-ring'
-                                    }`}
+                                    className={cn(
+                                        "w-full text-left rounded-md border px-3 py-2 transition-colors",
+                                        inactive && isSelected && "border-violet-600/60 bg-violet-950/40",
+                                        inactive && !isSelected && "border-border bg-card/50 opacity-50",
+                                        !inactive && isSelected && "border-violet-500/70 bg-violet-950/50",
+                                        !inactive && !isSelected && "border-border/50 bg-muted/40 hover:border-ring"
+                                    )}
                                 >
                                     <div className="flex items-start gap-2">
                                         {/* Indicator */}
-                                        <span className={`shrink-0 mt-0.5 w-3.5 h-3.5 flex items-center justify-center border ${
-                                            q.multiSelect ? 'rounded-sm' : 'rounded-full'
-                                        } ${
-                                            isSelected
-                                                ? 'border-violet-400 bg-violet-500'
-                                                : 'border-border'
-                                        }`}>
+                                        <span className={cn(
+                                            "shrink-0 mt-0.5 w-3.5 h-3.5 flex items-center justify-center border",
+                                            q.multiSelect ? "rounded-sm" : "rounded-full",
+                                            isSelected ? "border-violet-400 bg-violet-500" : "border-border"
+                                        )}>
                                             {isSelected && (
                                                 q.multiSelect
                                                     ? <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
@@ -176,7 +174,7 @@ export function QuestionMessage({ questionId, questions, onAnswer, disabled, ans
                                             )}
                                         </span>
                                         <div className="min-w-0">
-                                            <p className={`text-xs font-medium ${isSelected ? 'text-violet-200' : 'text-foreground'}`}>
+                                            <p className={cn("text-xs font-medium", isSelected ? "text-violet-200" : "text-foreground")}>
                                                 {opt.label}
                                             </p>
                                             <p className="text-[11px] text-muted-foreground leading-snug mt-0.5">{opt.description}</p>

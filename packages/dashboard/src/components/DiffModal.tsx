@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { X, FileCode, FilePlus, ExternalLink } from 'lucide-react'
 import * as Diff from 'diff'
+import { cn } from '../lib/utils'
 
 export interface FileDiff {
     relativePath: string
@@ -128,11 +129,12 @@ export function DiffModal({ diffs, onClose }: DiffModalProps) {
                             <button
                                 key={diff.relativePath}
                                 onClick={() => setSelectedIndex(i)}
-                                className={`w-full text-left px-3 py-2 text-xs border-b border-border/50 transition-colors ${
+                                className={cn(
+                                    "w-full text-left px-3 py-2 text-xs border-b border-border/50 transition-colors",
                                     i === selectedIndex
-                                        ? 'bg-muted text-foreground'
-                                        : 'text-muted-foreground hover:bg-card hover:text-foreground'
-                                }`}
+                                        ? "bg-muted text-foreground"
+                                        : "text-muted-foreground hover:bg-card hover:text-foreground"
+                                )}
                             >
                                 <div className="flex items-center gap-2">
                                     {isNewFile(diff)
@@ -145,11 +147,12 @@ export function DiffModal({ diffs, onClose }: DiffModalProps) {
                                             <div className="text-muted-foreground truncate">{dirPath(diff.relativePath)}</div>
                                         )}
                                     </div>
-                                    <span className={`ml-auto text-[10px] px-1.5 py-0.5 rounded flex-shrink-0 ${
+                                    <span className={cn(
+                                        "ml-auto text-[10px] px-1.5 py-0.5 rounded flex-shrink-0",
                                         isNewFile(diff)
-                                            ? 'bg-green-100/60 text-green-700 dark:bg-green-900/40 dark:text-green-400'
-                                            : 'bg-blue-100/60 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400'
-                                    }`}>
+                                            ? "bg-green-100/60 text-green-700 dark:bg-green-900/40 dark:text-green-400"
+                                            : "bg-blue-100/60 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400"
+                                    )}>
                                         {isNewFile(diff) ? 'New' : 'Modified'}
                                     </span>
                                 </div>
@@ -237,19 +240,20 @@ function renderHunkLines(hunk: Diff.Hunk) {
         }
 
         return (
-            <div key={i} className={`flex ${bgClass}`}>
+            <div key={i} className={cn("flex", bgClass)}>
                 <span className="w-10 text-right pr-1 text-muted-foreground select-none flex-shrink-0">
                     {leftNum}
                 </span>
                 <span className="w-10 text-right pr-1 text-muted-foreground select-none flex-shrink-0">
                     {rightNum}
                 </span>
-                <span className={`w-6 text-center select-none flex-shrink-0 ${
-                    prefix === '+' ? 'text-green-500' : prefix === '-' ? 'text-red-500' : 'text-muted-foreground'
-                }`}>
+                <span className={cn(
+                    "w-6 text-center select-none flex-shrink-0",
+                    prefix === '+' ? "text-green-500" : prefix === '-' ? "text-red-500" : "text-muted-foreground"
+                )}>
                     {prefix === ' ' ? '' : prefix}
                 </span>
-                <span className={`flex-1 whitespace-pre ${textClass}`}>{content}</span>
+                <span className={cn("flex-1 whitespace-pre", textClass)}>{content}</span>
             </div>
         )
     })

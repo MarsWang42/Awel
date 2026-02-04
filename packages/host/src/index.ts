@@ -12,7 +12,6 @@
 import { SIDEBAR_STATE_KEY, DASHBOARD_URL, setResolvedTheme } from './state.js';
 import {
   consoleEntries,
-  consoleHasUnviewed,
   dashboardIframe,
   setConsoleEntries,
   setConsoleHasUnviewed,
@@ -34,7 +33,6 @@ import {
   setInspectorAttachMode,
   setLastSelectedElement,
   setPendingInspectorPayload,
-  lastSelectedElement,
   pendingInspectorPayload,
   removeCommentPopup,
   cancelCommentPopup,

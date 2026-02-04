@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next'
+import { cn } from '../../lib/utils'
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '../ui/card'
 
 interface ConfirmMessageProps {
@@ -71,8 +72,8 @@ function DiffView({ oldStr, newStr }: { oldStr: string; newStr: string }) {
                         ? 'text-diff-add-marker'
                         : 'text-diff-context-text'
                 return (
-                    <div key={i} className={`${bg} px-2 leading-5 whitespace-pre-wrap break-all`}>
-                        <span className={`${prefixColor} select-none inline-block w-3 font-bold`}>{prefix}</span>
+                    <div key={i} className={cn("px-2 leading-5 whitespace-pre-wrap break-all", bg)}>
+                        <span className={cn("select-none inline-block w-3 font-bold", prefixColor)}>{prefix}</span>
                         <span className={textColor}>{line.text || '\u00A0'}</span>
                     </div>
                 )
@@ -181,7 +182,7 @@ export function ConfirmMessage({ confirmId, toolName, summary, details, resolved
     }
 
     return (
-        <Card className={`border-confirm-border bg-confirm-bg ${inactive ? 'opacity-75' : ''}`}>
+        <Card className={cn("border-confirm-border bg-confirm-bg", inactive && "opacity-75")}>
             <CardHeader className="p-3 pb-1">
                 <CardTitle className="text-sm font-medium flex items-center gap-2">
                     {renderIcon()}

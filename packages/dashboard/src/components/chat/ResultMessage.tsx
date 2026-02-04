@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { CheckCircle2, AlertCircle, Clock, DollarSign, Undo2, Eye } from 'lucide-react'
+import { cn } from '../../lib/utils'
 import type { ResultSubtype } from '../../types/messages'
 import type { FileDiff } from '../DiffModal'
 import { ConfirmDialog } from '../ui/confirm-dialog'
@@ -138,12 +139,14 @@ export function ResultMessage({
 
     return (
         <div
-            className={`border-l-2 ${isError ? 'border-red-500/50' : 'border-border/50'} pl-3 py-2 my-2`}
+            className={cn("border-l-2 pl-3 py-2 my-2", isError ? "border-red-500/50" : "border-border/50")}
         >
             {/* Header */}
             <div
-                className={`flex items-center gap-2 text-xs cursor-pointer transition-colors ${isError ? 'text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300' : 'text-foreground hover:text-foreground'
-                    }`}
+                className={cn(
+                    "flex items-center gap-2 text-xs cursor-pointer transition-colors",
+                    isError ? "text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300" : "text-foreground hover:text-foreground"
+                )}
                 onClick={() => setExpanded(!expanded)}
             >
                 {isError ? <AlertCircle className="w-3 h-3" /> : <CheckCircle2 className="w-3 h-3" />}

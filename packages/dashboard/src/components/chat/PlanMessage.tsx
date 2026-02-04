@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import ReactMarkdown from 'react-markdown'
+import { cn } from '../../lib/utils'
 import { Card, CardHeader, CardTitle, CardFooter } from '../ui/card'
 
 interface PlanMessageProps {
@@ -108,11 +109,12 @@ export function PlanMessage({ planId, title, content, onApprove, onComment, disa
                 <CardFooter className="p-3 pt-2">
                     <button
                         onClick={() => setModalOpen(true)}
-                        className={`w-full text-xs font-medium px-4 py-2 rounded transition-colors ${
+                        className={cn(
+                            "w-full text-xs font-medium px-4 py-2 rounded transition-colors",
                             approved
-                                ? 'bg-muted text-muted-foreground hover:bg-accent'
-                                : 'bg-primary text-primary-foreground hover:bg-primary/90'
-                        }`}
+                                ? "bg-muted text-muted-foreground hover:bg-accent"
+                                : "bg-primary text-primary-foreground hover:bg-primary/90"
+                        )}
                     >
                         {approved ? t('readPlan') : t('viewPlan')}
                     </button>

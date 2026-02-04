@@ -6,6 +6,7 @@ import { Tooltip } from './ui/tooltip'
 import { ConsoleChips } from './ConsoleChips'
 import { ImagePreviewModal } from './ImagePreviewModal'
 import { useConsole } from '../hooks/useConsole'
+import { cn } from '../lib/utils'
 import type { ConsoleEntry, SelectedElement, ContentSegment } from '../types/messages'
 
 interface ConsoleProps {
@@ -431,9 +432,10 @@ export function Console({ selectedModel, selectedModelProvider, modelReady, onMo
                         <button
                             type="button"
                             onClick={triggerInspectForAttach}
-                            className={`shrink-0 p-1 rounded transition-colors ${
-                                !inputEmpty ? 'text-rose-600 dark:text-rose-400' : 'text-muted-foreground hover:text-foreground'
-                            }`}
+                            className={cn(
+                                "shrink-0 p-1 rounded transition-colors",
+                                !inputEmpty ? "text-rose-600 dark:text-rose-400" : "text-muted-foreground hover:text-foreground"
+                            )}
                         >
                             <Crosshair className="w-4 h-4" />
                         </button>
@@ -442,9 +444,10 @@ export function Console({ selectedModel, selectedModelProvider, modelReady, onMo
                         <button
                             type="button"
                             onClick={handleImageAttach}
-                            className={`shrink-0 p-1 rounded transition-colors ${
-                                imageAttachments.length > 0 ? 'text-blue-600 dark:text-blue-400' : 'text-muted-foreground hover:text-foreground'
-                            }`}
+                            className={cn(
+                                "shrink-0 p-1 rounded transition-colors",
+                                imageAttachments.length > 0 ? "text-blue-600 dark:text-blue-400" : "text-muted-foreground hover:text-foreground"
+                            )}
                         >
                             <ImagePlus className="w-4 h-4" />
                         </button>
@@ -486,9 +489,10 @@ export function Console({ selectedModel, selectedModelProvider, modelReady, onMo
                             onKeyDown={handleEditableKeyDown}
                             onPaste={handleEditablePaste}
                             onClick={handleEditableClick}
-                            className={`px-4 py-2 text-sm text-foreground focus:outline-none min-w-0 ${
-                                isLoading || waitingForInput ? 'opacity-50 cursor-not-allowed' : ''
-                            }`}
+                            className={cn(
+                                "px-4 py-2 text-sm text-foreground focus:outline-none min-w-0",
+                                (isLoading || waitingForInput) && "opacity-50 cursor-not-allowed"
+                            )}
                             style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', minHeight: '20px', maxHeight: '80px', overflowY: 'auto' }}
                         />
                         {inputEmpty && (
@@ -561,15 +565,17 @@ function AttachedEntryPill({ entry, onRemove }: { entry: ConsoleEntry; onRemove:
             onMouseEnter={() => setShowTooltip(true)}
             onMouseLeave={() => setShowTooltip(false)}
         >
-            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold cursor-default ${
+            <span className={cn(
+                "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold cursor-default",
                 isError
-                    ? 'bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-100'
-                    : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-800 dark:text-yellow-100'
-            }`}>
+                    ? "bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-100"
+                    : "bg-yellow-100 text-yellow-800 dark:bg-yellow-800 dark:text-yellow-100"
+            )}>
                 {isError ? 'error' : 'warning'}
-                <span className={`font-normal text-[11px] truncate max-w-[160px] ${
-                    isError ? 'text-red-600 dark:text-red-200' : 'text-yellow-600 dark:text-yellow-200'
-                }`}>
+                <span className={cn(
+                    "font-normal text-[11px] truncate max-w-[160px]",
+                    isError ? "text-red-600 dark:text-red-200" : "text-yellow-600 dark:text-yellow-200"
+                )}>
                     {entry.message.length > 40 ? entry.message.slice(0, 40) + '\u2026' : entry.message}
                 </span>
                 <button

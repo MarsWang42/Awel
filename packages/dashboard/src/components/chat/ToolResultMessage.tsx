@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
 import { CheckCircle2, AlertCircle, FileCode, ChevronDown, ChevronRight } from 'lucide-react'
+import { cn } from '../../lib/utils'
 
 interface ToolResultMessageProps {
     toolName?: string
@@ -49,10 +50,12 @@ export function ToolResultMessage({ toolName, output, isError }: ToolResultMessa
     const hasMore = (output?.length || 0) > 80 || (output?.split('\n').length || 0) > 1
 
     return (
-        <div className={`border-l-2 ${isError ? 'border-red-500/50' : 'border-border/50'} pl-3 py-1 my-0.5`}>
+        <div className={cn("border-l-2 pl-3 py-1 my-0.5", isError ? "border-red-500/50" : "border-border/50")}>
             <div
-                className={`flex items-center gap-2 text-xs cursor-pointer transition-colors ${isError ? 'text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300' : 'text-muted-foreground hover:text-foreground'
-                    }`}
+                className={cn(
+                    "flex items-center gap-2 text-xs cursor-pointer transition-colors",
+                    isError ? "text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300" : "text-muted-foreground hover:text-foreground"
+                )}
                 onClick={() => setExpanded(!expanded)}
             >
                 {isError ? (
@@ -77,8 +80,10 @@ export function ToolResultMessage({ toolName, output, isError }: ToolResultMessa
                 )}
             </div>
             {expanded && output && (
-                <pre className={`text-[11px] mt-2 overflow-x-auto max-h-64 overflow-y-auto rounded p-2 font-mono ${isError ? 'text-red-700 bg-red-100/50 dark:text-red-300 dark:bg-red-950/30' : 'text-muted-foreground bg-card/50'
-                    }`}>
+                <pre className={cn(
+                    "text-[11px] mt-2 overflow-x-auto max-h-64 overflow-y-auto rounded p-2 font-mono",
+                    isError ? "text-red-700 bg-red-100/50 dark:text-red-300 dark:bg-red-950/30" : "text-muted-foreground bg-card/50"
+                )}>
                     {output}
                 </pre>
             )}
