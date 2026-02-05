@@ -37,9 +37,9 @@ export function createProxyMiddleware(
         const url = new URL(c.req.url);
         const comparisonPhase = getComparisonPhase?.();
 
-        // In creation mode or building phase, serve the dashboard at all HTML navigation requests.
-        // Non-HTML requests (JS, CSS, HMR) still proxy through to the dev server.
-        if (isFresh?.() || comparisonPhase === 'building') {
+        // Serve creation mode dashboard when fresh AND not in comparing phase.
+        // In comparing phase, show the actual app with the comparison overlay instead.
+        if (isFresh?.() && comparisonPhase !== 'comparing') {
             const accept = c.req.header('accept') || '';
             const isNavigation = accept.includes('text/html');
             if (isNavigation) {

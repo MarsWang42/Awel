@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
-import { MessageSquare, Minimize2, Loader2, ChevronLeft, Sun, Moon, AlertCircle, RotateCcw, Clock, Zap, FileText } from 'lucide-react'
+import { MessageSquare, Minimize2, Loader2, ChevronLeft, Sun, Moon, AlertCircle, RotateCcw, Clock, ArrowUp, ArrowDown, FileText } from 'lucide-react'
 import { Button } from './ui/button'
+import { Tooltip } from './ui/tooltip'
 import { Console } from './Console'
 import { DiffModal, type FileDiff } from './DiffModal'
 import { useTheme } from '../hooks/useTheme'
@@ -471,10 +472,20 @@ export function ComparisonView() {
                                             <span>{(run.duration / 1000).toFixed(1)}s</span>
                                         )}
                                         {run.tokenUsage && (
-                                            <span className="flex items-center gap-1">
-                                                <Zap className="w-3 h-3" />
-                                                {run.tokenUsage.input + run.tokenUsage.output}
-                                            </span>
+                                            <>
+                                                <Tooltip text={t('inputTokens', 'Input tokens')} position="top">
+                                                    <span className="flex items-center gap-0.5">
+                                                        <ArrowUp className="w-3 h-3" />
+                                                        {run.tokenUsage.input.toLocaleString()}
+                                                    </span>
+                                                </Tooltip>
+                                                <Tooltip text={t('outputTokens', 'Output tokens')} position="top">
+                                                    <span className="flex items-center gap-0.5">
+                                                        <ArrowDown className="w-3 h-3" />
+                                                        {run.tokenUsage.output.toLocaleString()}
+                                                    </span>
+                                                </Tooltip>
+                                            </>
                                         )}
                                     </div>
                                 </button>
@@ -483,18 +494,30 @@ export function ComparisonView() {
                     </div>
                 )}
 
-                {/* Console errors indicator */}
-                {!modelSelectorOpen && consoleEntries.length > 0 && (
-                    <div className="px-3 py-2 border-t border-border shrink-0">
-                        <button
-                            onClick={handleOpenChat}
-                            className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 text-xs font-medium hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors"
-                        >
-                            <AlertCircle className="w-3.5 h-3.5" />
-                            <span>{consoleEntries.filter(e => e.level === 'error').length} errors</span>
-                        </button>
-                    </div>
-                )}
+                {/* Console errors/warnings indicator */}
+                {!modelSelectorOpen && consoleEntries.length > 0 && (() => {
+                    const errorCount = consoleEntries.filter(e => e.level === 'error').length
+                    const warnCount = consoleEntries.filter(e => e.level === 'warning').length
+                    const hasErrors = errorCount > 0
+                    return (
+                        <div className="px-3 py-2 border-t border-border shrink-0">
+                            <button
+                                onClick={handleOpenChat}
+                                className={cn(
+                                    "w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-xs font-medium transition-colors",
+                                    hasErrors
+                                        ? "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-900/50"
+                                        : "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 hover:bg-yellow-200 dark:hover:bg-yellow-900/50"
+                                )}
+                            >
+                                <AlertCircle className="w-3.5 h-3.5" />
+                                <span>
+                                    {hasErrors ? `${errorCount} error${errorCount !== 1 ? 's' : ''}` : `${warnCount} warning${warnCount !== 1 ? 's' : ''}`}
+                                </span>
+                            </button>
+                        </div>
+                    )
+                })()}
 
                 {/* Actions */}
                 {!modelSelectorOpen && (

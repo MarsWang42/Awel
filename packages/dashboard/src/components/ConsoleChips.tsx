@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useState, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AlertTriangle, ChevronDown, X, XCircle, Trash2 } from 'lucide-react'
 import { cn } from '../lib/utils'
@@ -107,7 +107,8 @@ function ConsoleChip({ entry, onEntryClick, onDismiss }: {
     onDismiss: (id: string) => void
 }) {
     const [showTooltip, setShowTooltip] = useState(false)
-    const chipRef = useRef<HTMLDivElement>(null)
+    const [tooltipPos, setTooltipPos] = useState<{ bottom: number; right: number } | null>(null)
+    const chipRef = useRef<HTMLButtonElement>(null)
     const hideTimeoutRef = useRef<number | null>(null)
     const trace = formatTrace(entry)
 
@@ -125,26 +126,38 @@ function ConsoleChip({ entry, onEntryClick, onDismiss }: {
         }, 120)
     }
 
-    const tooltipStyle = (): React.CSSProperties | undefined => {
-        if (!chipRef.current) return undefined
-        const rect = chipRef.current.getBoundingClientRect()
-        return {
-            position: 'fixed',
-            bottom: window.innerHeight - rect.top + 6,
-            right: window.innerWidth - rect.right,
+    const handleMouseEnter = () => {
+        clearHideTimeout()
+        if (chipRef.current) {
+            const chipRect = chipRef.current.getBoundingClientRect()
+
+            // Find the containing block (ancestor with transform) for fixed positioning
+            // This handles the case where ComparisonView's chat panel has transforms
+            let container = chipRef.current.parentElement
+            let containerRect = { top: 0, right: window.innerWidth, bottom: window.innerHeight, left: 0, width: window.innerWidth, height: window.innerHeight }
+
+            while (container) {
+                const style = window.getComputedStyle(container)
+                if (style.transform !== 'none') {
+                    containerRect = container.getBoundingClientRect()
+                    break
+                }
+                container = container.parentElement
+            }
+
+            // Position above the chip, right-aligned, relative to containing block
+            setTooltipPos({
+                bottom: containerRect.bottom - chipRect.top + 6,
+                right: containerRect.right - chipRect.right,
+            })
         }
+        setShowTooltip(true)
     }
 
     return (
-        <div
-            ref={chipRef}
-            onMouseEnter={() => {
-                clearHideTimeout()
-                setShowTooltip(true)
-            }}
-            onMouseLeave={scheduleHide}
-        >
+        <div onMouseEnter={handleMouseEnter} onMouseLeave={scheduleHide}>
             <button
+                ref={chipRef}
                 onClick={() => onEntryClick(entry)}
                 className={cn(
                     "group flex items-start gap-1.5 px-2.5 py-2 rounded-md border text-left text-xs transition-colors cursor-pointer w-full",
@@ -190,9 +203,9 @@ function ConsoleChip({ entry, onEntryClick, onDismiss }: {
                 </span>
             </button>
 
-            {showTooltip && (
+            {showTooltip && tooltipPos && (
                 <div
-                    style={tooltipStyle()}
+                    style={{ position: 'fixed', bottom: tooltipPos.bottom, right: tooltipPos.right }}
                     className={cn(
                         "z-[9999] w-72 max-h-48 overflow-y-auto rounded-md border p-2.5 text-xs shadow-lg whitespace-pre-wrap break-words font-mono pointer-events-auto",
                         entry.level === 'error'
