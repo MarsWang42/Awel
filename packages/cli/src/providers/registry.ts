@@ -86,6 +86,15 @@ const PROVIDER_CATALOG: ProviderCatalogEntry[] = [
         ],
     },
     {
+        id: 'moonshot',
+        label: 'Moonshot AI',
+        color: 'text-indigo-600 dark:text-indigo-400',
+        envVar: 'MOONSHOT_API_KEY',
+        models: [
+            { id: 'kimi-k2.5', label: 'Kimi K2.5' },
+        ],
+    },
+    {
         id: 'openrouter',
         label: 'OpenRouter',
         color: 'text-teal-600 dark:text-teal-400',

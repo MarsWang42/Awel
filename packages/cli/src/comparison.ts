@@ -61,6 +61,39 @@ function deleteComparisonState(projectCwd: string): void {
     }
 }
 
+/**
+ * Abort comparison mode completely.
+ * Used when user cancels during creation - cleans up all branches and state.
+ */
+export function abortComparison(projectCwd: string): void {
+    const state = getComparisonState(projectCwd);
+    if (!state) return;
+
+    // Try to switch back to main branch
+    try {
+        execGit(projectCwd, 'checkout main');
+    } catch {
+        // May already be on main or main doesn't exist
+        try {
+            execGit(projectCwd, 'checkout master');
+        } catch {
+            // Ignore - we'll still clean up the state file
+        }
+    }
+
+    // Delete all comparison branches
+    for (const run of state.runs) {
+        try {
+            execGit(projectCwd, `branch -D ${run.branchName}`);
+        } catch {
+            // Branch may not exist or may be current branch
+        }
+    }
+
+    // Remove comparison state file
+    deleteComparisonState(projectCwd);
+}
+
 function execGit(projectCwd: string, args: string): string {
     return execSync(`git ${args}`, { cwd: projectCwd, encoding: 'utf-8' }).trim();
 }

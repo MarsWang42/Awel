@@ -140,3 +140,27 @@ export function getAlwaysMemoryContext(projectCwd: string): string | null {
     }
     return block;
 }
+
+const MAX_CONTEXTUAL_CONTEXT_LENGTH = 2000;
+
+/**
+ * Auto-retrieves contextual memories relevant to the user's prompt.
+ * Returns formatted context to inject, or null if no relevant memories.
+ * Also touches the memories to update usage stats.
+ */
+export function getContextualMemoryContext(projectCwd: string, userPrompt: string): string | null {
+    const results = searchMemories(projectCwd, userPrompt);
+    if (results.length === 0) return null;
+
+    // Touch memories to update usage stats
+    touchMemories(projectCwd, results.map(r => r.id));
+
+    let block = '[Relevant Context from Past Sessions]';
+    for (const entry of results) {
+        const tags = entry.tags.length > 0 ? ` (${entry.tags.join(', ')})` : '';
+        const line = `\n- ${entry.content}${tags}`;
+        if (block.length + line.length > MAX_CONTEXTUAL_CONTEXT_LENGTH) break;
+        block += line;
+    }
+    return block;
+}

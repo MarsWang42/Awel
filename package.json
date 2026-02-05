@@ -24,6 +24,7 @@
     "dependencies": {
         "@ai-sdk/anthropic": "^3.0.31",
         "@ai-sdk/google": "^3.0.18",
+        "@ai-sdk/moonshotai": "^2.0.0",
         "@ai-sdk/openai": "^3.0.21",
         "@clack/prompts": "^0.9.1",
         "@hono/node-server": "^1.13.7",

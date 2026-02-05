@@ -6,6 +6,7 @@ import { claudeCode } from 'ai-sdk-provider-claude-code';
 import { createMinimax } from 'vercel-minimax-ai-provider';
 import { createZhipu } from 'zhipu-ai-provider';
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
+import { createMoonshotAI } from '@ai-sdk/moonshotai';
 import { pauseDevServer, resumeDevServer } from '../devserver.js';
 import { addToHistory, writeSSEEvent } from '../sse.js';
 import { awelTools } from '../tools/index.js';
@@ -13,7 +14,7 @@ import { rejectAllPending } from '../confirm-store.js';
 import { storePlan } from '../plan-store.js';
 import { startUndoSession, endUndoSession, getCurrentSessionStats } from '../undo.js';
 import { logEvent } from '../verbose.js';
-import { getAlwaysMemoryContext } from '../memory.js';
+import { getAlwaysMemoryContext, getContextualMemoryContext } from '../memory.js';
 import type { SSEStreamingApi } from 'hono/streaming';
 import type { ModelMessage } from 'ai';
 import type { StreamProvider, ProviderConfig, ResponseMessage, ProviderType } from './types.js';
@@ -51,12 +52,24 @@ Guidelines:
 - If a task requires multiple steps, work through them methodically
 
 Memory:
-- When you discover important project patterns, conventions, or constraints during a task, save them using the Memory tool with action 'write'.
-- Use scope 'always' for things every conversation should know (tech stack, coding rules, directory structure).
-- Use scope 'contextual' for specific facts about particular files, components, or past decisions.
-- Write factual, specific content. Avoid vague generalizations.
-- Include relevant tags (file names, component names, library names) for better retrieval.
-- Before working on an unfamiliar part of the codebase, use Memory with action 'search' to check if there are relevant contextual memories from past sessions.
+Save knowledge that will help in future sessions using Memory tool with action 'write'.
+
+WHEN TO SAVE (action 'write'):
+- After fixing a bug: Save the root cause and solution. Example: "Auth token refresh fails silently when network is slow - added retry logic in src/api/auth.ts"
+- After learning a project quirk: Save the constraint. Example: "CSS modules break in app/ directory - use Tailwind only"
+- After making an architectural decision: Save the reasoning. Example: "Using Zustand over Redux for simplicity - see stores/ directory"
+- After discovering undocumented behavior: Save the finding. Example: "API /users endpoint requires X-Tenant header even though not in docs"
+
+WHEN TO SEARCH (action 'search'):
+- When user says "like before", "the same way", "as usual", or references past work
+- When working on code that might have known issues or patterns
+- When the user asks "how did we..." or "what was the..."
+
+SCOPE GUIDANCE:
+- 'always': Project-wide rules every conversation needs (tech stack, coding standards, directory structure)
+- 'contextual': Specific facts about files, components, bugs, or decisions
+
+After completing a significant task, consider: "What did I learn that would be useful next time?"
 
 Plan Mode:
 - When a user's request involves changes to 2 or more files, or any non-trivial multi-step work, you MUST use the ProposePlan tool FIRST before making any changes.
@@ -130,7 +143,11 @@ Quality Standards:
 - No placeholder content or TODOs
 - Every page should feel complete and polished
 - Design should look like it was made by a professional
-- Small details matter: shadows, borders, spacing, hover states`;
+- Small details matter: shadows, borders, spacing, hover states
+
+Execution:
+- Do NOT use the ProposePlan tool. Execute the implementation directly without asking for approval.
+- You may use the AskUser tool if you need clarification on specific details.`;
 
 const CREATION_SYSTEM_PROMPT_ZH = `你是 Awel 创作模式——一个专注于设计的 AI，能够创建精美、生产级别的网站。用户有一个全新的 Next.js 项目，希望构建视觉效果出众的网站。
 
@@ -180,6 +197,10 @@ const CREATION_SYSTEM_PROMPT_ZH = `你是 Awel 创作模式——一个专注于
 - 每个页面都应该完整且精致
 - 设计应该看起来像专业人士制作的
 - 细节很重要：阴影、边框、间距、悬停状态
+
+执行方式：
+- 不要使用 ProposePlan 工具。直接执行实现，无需请求批准。
+- 如果需要澄清具体细节，可以使用 AskUser 工具。
 
 语言要求：
 - 所有用户可见的界面文案必须使用中文
@@ -258,6 +279,9 @@ function createModel(modelId: string, providerType: ProviderType, cwd?: string) 
             apiKey: process.env.OPENROUTER_API_KEY,
         });
         return openrouter.chat(modelId);
+    } else if (providerType === 'moonshot') {
+        const moonshot = createMoonshotAI({});
+        return moonshot(modelId);
     } else {
         // vercel-gateway: pass model ID string directly to streamText
         // ai v6 routes through the gateway using AI_GATEWAY_API_KEY env var
@@ -281,6 +305,7 @@ export function createVercelProvider(modelId: string, providerType: ProviderType
                 minimax: 'MiniMax',
                 zhipu: 'Zhipu AI',
                 openrouter: 'OpenRouter',
+                moonshot: 'Moonshot AI',
             };
             const providerLabel = PROVIDER_LABEL_MAP[providerType];
             await writeSSEEvent(stream, 'status', {
@@ -308,8 +333,8 @@ export function createVercelProvider(modelId: string, providerType: ProviderType
             const tools = isSelfContained ? undefined : awelTools({
                 cwd: config.projectCwd,
                 emitSSE,
-                confirmBash: true,
-                confirmFileWrites: true,
+                confirmBash: !config.creationMode,
+                confirmFileWrites: !config.creationMode,
             });
 
             pauseDevServer(config.targetPort);
@@ -359,6 +384,15 @@ export function createVercelProvider(modelId: string, providerType: ProviderType
                     const memoryContext = getAlwaysMemoryContext(config.projectCwd);
                     if (memoryContext) {
                         systemPrompt += '\n\n' + memoryContext;
+                    }
+                }
+
+                // Auto-retrieve contextual memories relevant to the user's prompt
+                if (!isSelfContained && systemPrompt && lastUserPrompt) {
+                    const contextualMemory = getContextualMemoryContext(config.projectCwd, lastUserPrompt);
+                    if (contextualMemory) {
+                        systemPrompt += '\n\n' + contextualMemory;
+                        logEvent('memory', `Auto-retrieved contextual memories for prompt`);
                     }
                 }
 

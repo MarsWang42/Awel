@@ -120,6 +120,7 @@ The core server and agent orchestration layer.
 | Google AI | gemini-3-pro-preview, gemini-3-flash-preview, gemini-2.5-pro, gemini-2.5-flash | `@ai-sdk/google` | `GOOGLE_GENERATIVE_AI_API_KEY` |
 | MiniMax | MiniMax-M2 | `vercel-minimax-ai-provider` | `MINIMAX_API_KEY` |
 | Zhipu AI | glm-4-plus, glm-4-flash, glm-4-long | `zhipu-ai-provider` | `ZHIPU_API_KEY` |
+| Moonshot AI | kimi-k2.5 | `@ai-sdk/moonshotai` | `MOONSHOT_API_KEY` |
 | Vercel Gateway | anthropic/claude-sonnet-4-5, anthropic/claude-opus-4-5, anthropic/claude-sonnet-4, anthropic/claude-opus-4 | Vercel AI SDK | `AI_GATEWAY_API_KEY` |
 | OpenRouter | Custom model input | `@openrouter/ai-sdk-provider` | `OPENROUTER_API_KEY` |
 

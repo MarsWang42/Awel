@@ -23,6 +23,7 @@ import {
     markRunComplete,
     resumeComparison,
     getComparisonPhase,
+    abortComparison,
     type ComparisonPhase,
 } from './comparison.js';
 import { clearHistory } from './sse.js';
@@ -72,9 +73,6 @@ export async function startServer({ awelPort, targetPort, projectCwd, fresh }: S
   const resumedState = resumeComparison(projectCwd);
   if (resumedState) {
     comparisonPhase = resumedState.phase;
-    if (comparisonPhase) {
-      isFresh = false;
-    }
   }
 
   // Create a proxy for WebSocket connections
@@ -116,34 +114,6 @@ export async function startServer({ awelPort, targetPort, projectCwd, fresh }: S
     });
   });
 
-  app.post('/api/project/mark-ready', async (c) => {
-    // If in comparison mode, mark the current run as complete instead of ending fresh mode
-    const state = getComparisonState(projectCwd);
-    if (state && state.activeRunId) {
-      // Parse optional stats from request body
-      let stats: { duration?: number; inputTokens?: number; outputTokens?: number } | undefined;
-      try {
-        const body = await c.req.json();
-        if (body.duration !== undefined || body.inputTokens !== undefined || body.outputTokens !== undefined) {
-          stats = {
-            duration: body.duration,
-            inputTokens: body.inputTokens,
-            outputTokens: body.outputTokens,
-          };
-        }
-      } catch {
-        // No body or invalid JSON, stats remain undefined
-      }
-      const updatedState = markRunComplete(projectCwd, state.activeRunId, true, stats);
-      comparisonPhase = updatedState.phase;
-      return c.json({ success: true, comparison: updatedState });
-    }
-
-    markProjectReady(projectCwd);
-    isFresh = false;
-    return c.json({ success: true });
-  });
-
   // ─── Comparison API Endpoints ─────────────────────────────
   app.get('/api/comparison/runs', (c) => {
     const state = getComparisonState(projectCwd);
@@ -181,7 +151,7 @@ export async function startServer({ awelPort, targetPort, projectCwd, fresh }: S
         }
         const state = initComparison(projectCwd, prompt, modelId, modelLabel || modelId, modelProvider, providerLabel || modelProvider);
         comparisonPhase = state.phase;
-        isFresh = false; // No longer in fresh mode, now in comparison mode
+        // Note: isFresh stays true until user selects a version (in /select endpoint)
         return c.json({
           success: true,
           run: state.runs[0],
@@ -228,13 +198,14 @@ export async function startServer({ awelPort, targetPort, projectCwd, fresh }: S
     // Each step is independent - don't let one failure prevent others
     try { selectRun(projectCwd, runId); } catch { /* merge may have succeeded */ }
 
-    // Always clear comparison phase
+    // Always clear comparison phase and mark as no longer fresh
     comparisonPhase = null;
+    isFresh = false;
 
-    // Always mark project ready
+    // Persist to config file
     try { markProjectReady(projectCwd); } catch { /* non-critical */ }
 
-    // Always clear session state
+    // Clear session state
     try { clearHistory(); } catch { /* non-critical */ }
     try { resetSession(); } catch { /* non-critical */ }
     try { resetAutoApprove(); } catch { /* non-critical */ }
@@ -269,6 +240,21 @@ export async function startServer({ awelPort, targetPort, projectCwd, fresh }: S
       const state = deleteRun(projectCwd, runId);
       comparisonPhase = state.phase;
       return c.json({ success: true, state });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      return c.json({ success: false, error: message }, 400);
+    }
+  });
+
+  app.post('/api/comparison/abort', async (c) => {
+    try {
+      abortComparison(projectCwd);
+      comparisonPhase = null;
+      // Clear chat history and session for a clean slate
+      try { clearHistory(); } catch { /* non-critical */ }
+      try { resetSession(); } catch { /* non-critical */ }
+      try { resetAutoApprove(); } catch { /* non-critical */ }
+      return c.json({ success: true });
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error';
       return c.json({ success: false, error: message }, 400);

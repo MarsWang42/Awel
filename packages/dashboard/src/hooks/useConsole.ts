@@ -813,6 +813,10 @@ export function useConsole(selectedModel: string, selectedModelProvider: string,
         return elements
     }, [messages, handlePlanApprove, handlePlanComment, handleQuestionAnswer, handleConfirmResponse, reattachConsoleEntry, onReviewDiffs, aborted])
 
+    const clearMessages = useCallback(() => {
+        setMessages([])
+    }, [])
+
     return {
         messages,
         isLoading,
@@ -821,6 +825,7 @@ export function useConsole(selectedModel: string, selectedModelProvider: string,
         onImageClickRef,
         submitMessage,
         stopStream,
+        clearMessages,
         messagesEndRef,
         renderedMessages,
         consoleEntries,

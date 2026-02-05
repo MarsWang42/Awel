@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Send, Loader2, Square, Sparkles, Sun, Moon } from 'lucide-react'
+import { Send, Loader2, Sparkles, Sun, Moon, Rocket, Palette, Package, UtensilsCrossed, Square } from 'lucide-react'
 import { Button } from './ui/button'
-import { ModelSelector, type ModelSelectorHandle } from './ModelSelector'
+import { ModelSelector } from './ModelSelector'
 import { useConsole } from '../hooks/useConsole'
 import { useTheme } from '../hooks/useTheme'
 import { cn } from '../lib/utils'
@@ -24,15 +24,22 @@ interface StyleOption {
 interface CategoryOption {
     labelKey: string
     fallback: string
-    icon: string
+    iconKey: 'rocket' | 'palette' | 'package' | 'utensils'
     styles: StyleOption[]
+}
+
+const CATEGORY_ICONS = {
+    rocket: Rocket,
+    palette: Palette,
+    package: Package,
+    utensils: UtensilsCrossed,
 }
 
 const CREATION_CATEGORIES: CategoryOption[] = [
     {
         labelKey: 'creationChipSaaS',
         fallback: 'SaaS Landing Page',
-        icon: '🚀',
+        iconKey: 'rocket',
         styles: [
             { nameKey: 'styleSaasGradientName', descKey: 'styleSaasGradientDesc', promptKey: 'promptSaasGradient' },
             { nameKey: 'styleSaasDarkName', descKey: 'styleSaasDarkDesc', promptKey: 'promptSaasDark' },
@@ -42,7 +49,7 @@ const CREATION_CATEGORIES: CategoryOption[] = [
     {
         labelKey: 'creationChipAgency',
         fallback: 'Creative Portfolio',
-        icon: '🎨',
+        iconKey: 'palette',
         styles: [
             { nameKey: 'styleAgencyEditorialName', descKey: 'styleAgencyEditorialDesc', promptKey: 'promptAgencyEditorial' },
             { nameKey: 'styleAgencyBrutalistName', descKey: 'styleAgencyBrutalistDesc', promptKey: 'promptAgencyBrutalist' },
@@ -52,7 +59,7 @@ const CREATION_CATEGORIES: CategoryOption[] = [
     {
         labelKey: 'creationChipProduct',
         fallback: 'Product Showcase',
-        icon: '✨',
+        iconKey: 'package',
         styles: [
             { nameKey: 'styleProductLuxuryName', descKey: 'styleProductLuxuryDesc', promptKey: 'promptProductLuxury' },
             { nameKey: 'styleProductGlassName', descKey: 'styleProductGlassDesc', promptKey: 'promptProductGlass' },
@@ -62,7 +69,7 @@ const CREATION_CATEGORIES: CategoryOption[] = [
     {
         labelKey: 'creationChipLocal',
         fallback: 'Restaurant & Local',
-        icon: '🍽️',
+        iconKey: 'utensils',
         styles: [
             { nameKey: 'styleLocalWarmName', descKey: 'styleLocalWarmDesc', promptKey: 'promptLocalWarm' },
             { nameKey: 'styleLocalModernName', descKey: 'styleLocalModernDesc', promptKey: 'promptLocalModern' },
@@ -110,10 +117,12 @@ export function CreationView({ initialModel, initialModelProvider, onModelChange
     const [contextInput, setContextInput] = useState('')
     const [comparisonState, setComparisonState] = useState<ComparisonState | null>(null)
     const [pendingAutoSubmit, setPendingAutoSubmit] = useState<string | null>(null)
+    const [errorMessage, setErrorMessage] = useState<string | null>(null)
+    const [generatedPrompt, setGeneratedPrompt] = useState<string | null>(null)
+    const [creationMode, setCreationMode] = useState<'template' | 'custom'>('template')
     const inputRef = useRef<HTMLTextAreaElement>(null)
     const contextInputRef = useRef<HTMLInputElement>(null)
     const messagesEndRef = useRef<HTMLDivElement>(null)
-    const modelSelectorRef = useRef<ModelSelectorHandle>(null)
 
     const {
         messages,
@@ -121,6 +130,7 @@ export function CreationView({ initialModel, initialModelProvider, onModelChange
         renderedMessages,
         submitMessage,
         stopStream,
+        clearMessages,
         waitingForInput,
     } = useConsole(selectedModel, selectedModelProvider)
 
@@ -138,36 +148,60 @@ export function CreationView({ initialModel, initialModelProvider, onModelChange
         }
     }, [messages.length, phase])
 
-    // When the agent finishes successfully, mark the project/run as ready and transition.
+    // When the agent finishes, handle success or error.
     useEffect(() => {
         if (phase !== 'building') return
+
+        // Check for errors first
+        const lastError = [...messages].reverse().find(m => m.type === 'error')
         const lastResult = [...messages].reverse().find(m => m.type === 'result')
+
+        // Handle error case - show error and return to initial phase
+        if (lastError && !isLoading) {
+            const errorMsg = lastError.message || t('creationError', 'Something went wrong. Please try again.')
+            setErrorMessage(errorMsg)
+            setPhase('initial')
+            return
+        }
+
+        // Handle failed result (e.g., API quota exceeded, timeout)
+        if (lastResult && lastResult.isError && !isLoading) {
+            const errorMsg = lastResult.result || t('creationError', 'Something went wrong. Please try again.')
+            setErrorMessage(errorMsg)
+            setPhase('initial')
+            return
+        }
+
+        // Handle successful completion
         if (lastResult && lastResult.resultSubtype === 'success') {
             // Mark the run as complete (this transitions to comparing phase)
             // Include duration and token usage stats for the comparison view
-            fetch('/api/project/mark-ready', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    duration: lastResult.durationMs,
-                    inputTokens: lastResult.inputTokens,
-                    outputTokens: lastResult.outputTokens,
-                }),
-            })
-                .then(r => r.json())
-                .then(data => {
-                    if (data.comparison) {
-                        setComparisonState(data.comparison)
-                    }
+            if (comparisonState?.activeRunId) {
+                fetch(`/api/comparison/runs/${comparisonState.activeRunId}/complete`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        success: true,
+                        duration: lastResult.durationMs,
+                        inputTokens: lastResult.inputTokens,
+                        outputTokens: lastResult.outputTokens,
+                    }),
                 })
-                .catch(() => {})
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.state) {
+                            setComparisonState(data.state)
+                        }
+                    })
+                    .catch(() => {})
+            }
             setPhase('success')
             setTimeout(() => {
                 // Redirect to app - comparison sidebar will be shown by host script
                 window.location.href = '/'
             }, 3000)
         }
-    }, [messages, phase])
+    }, [messages, phase, isLoading, t])
 
     // Auto-scroll messages
     useEffect(() => {
@@ -252,6 +286,7 @@ export function CreationView({ initialModel, initialModelProvider, onModelChange
         const prompt = text || input.trim()
         if (!prompt || isLoading) return
         setInput('')
+        setErrorMessage(null) // Clear any previous error
 
         // Transition to building phase immediately to prevent UI flicker
         setPhase('building')
@@ -313,11 +348,12 @@ export function CreationView({ initialModel, initialModelProvider, onModelChange
         // Build the full prompt with user's context (prompt is already localized via i18n)
         const basePrompt = t(selectedStyle.promptKey)
         const prompt = basePrompt.replace('{{context}}', context)
+        // Set the generated prompt to show review view
+        setGeneratedPrompt(prompt)
         setSelectedCategory(null)
         setSelectedStyle(null)
         setContextInput('')
-        handleSubmit(prompt)
-    }, [selectedStyle, contextInput, handleSubmit, t])
+    }, [selectedStyle, contextInput, t])
 
     const handleBackToCategories = useCallback(() => {
         setSelectedCategory(null)
@@ -333,6 +369,23 @@ export function CreationView({ initialModel, initialModelProvider, onModelChange
     const handleToggleTheme = () => {
         setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')
     }
+
+    const handleAbort = useCallback(async () => {
+        // Stop the stream
+        stopStream()
+
+        // Abort comparison mode (cleans up branches, state file, and chat history)
+        try {
+            await fetch('/api/comparison/abort', { method: 'POST' })
+        } catch {
+            // Ignore errors during cleanup
+        }
+
+        // Reset to initial state
+        clearMessages()
+        setComparisonState(null)
+        setPhase('initial')
+    }, [stopStream, clearMessages])
 
     // ─── Success State ──────────────────────────────────────
     if (phase === 'success') {
@@ -371,7 +424,6 @@ export function CreationView({ initialModel, initialModelProvider, onModelChange
                 <div className="flex items-center gap-2">
                     {(modelReady || phase !== 'initial') && (
                         <ModelSelector
-                            ref={modelSelectorRef}
                             selectedModel={selectedModel}
                             selectedModelProvider={selectedModelProvider}
                             onModelChange={handleModelChange}
@@ -433,139 +485,265 @@ export function CreationView({ initialModel, initialModelProvider, onModelChange
                     </div>
                 )}
 
-                {/* Step 2: describe what to build */}
-                {phase === 'initial' && modelReady && (
+                {/* Step 2a: Main view - tabbed interface for template vs custom */}
+                {phase === 'initial' && modelReady && !generatedPrompt && (
                     <div className="flex-1 flex flex-col items-center justify-center w-full max-w-2xl px-6">
-                        <div className="text-center mb-8 space-y-3">
-                            <h1 className="text-3xl font-semibold text-foreground tracking-tight">
-                                {selectedStyle
-                                    ? (selectedCategory?.labelKey === 'creationChipSaaS'
-                                        ? t('creationSaasQuestion', 'What does your product do?')
-                                        : selectedCategory?.labelKey === 'creationChipAgency'
-                                            ? t('creationAgencyQuestion', 'What do you create?')
-                                            : selectedCategory?.labelKey === 'creationChipProduct'
-                                                ? t('creationProductQuestion', 'What are you selling?')
-                                                : t('creationLocalQuestion', 'What type of establishment?'))
-                                    : selectedCategory
-                                        ? t('creationChooseStyle', 'Choose a design style')
-                                        : t('creationHeading', 'What would you like to build?')
-                                }
-                            </h1>
-                            <p className="text-sm text-muted-foreground">
-                                {selectedStyle
-                                    ? `${t(selectedStyle.nameKey)} · ${selectedCategory?.icon} ${t(selectedCategory?.labelKey || '', selectedCategory?.fallback)}`
-                                    : selectedCategory
-                                        ? `${selectedCategory.icon} ${t(selectedCategory.labelKey, selectedCategory.fallback)}`
-                                        : t('creationSubheading', 'Describe your app and Awel will create it for you.')
-                                }
-                            </p>
-                        </div>
-
-                        {/* Category selection */}
-                        {!selectedCategory && (
-                            <div className="grid grid-cols-2 gap-3 mb-8 w-full max-w-md">
-                                {CREATION_CATEGORIES.map((category) => (
+                        {/* Error banner */}
+                        {errorMessage && (
+                            <div className="w-full max-w-lg mb-6 px-4 py-3 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50">
+                                <div className="flex items-start gap-3">
+                                    <span className="text-red-500 text-lg shrink-0">⚠️</span>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-medium text-red-800 dark:text-red-200">
+                                            {t('creationFailed', 'Creation failed')}
+                                        </p>
+                                        <p className="text-xs text-red-600 dark:text-red-400 mt-1 break-words">
+                                            {errorMessage}
+                                        </p>
+                                    </div>
                                     <button
-                                        key={category.labelKey}
-                                        onClick={() => handleCategoryClick(category)}
-                                        className="flex flex-col items-center gap-2 px-4 py-4 rounded-xl border border-border bg-card hover:bg-accent hover:border-ring transition-colors text-center"
+                                        onClick={() => setErrorMessage(null)}
+                                        className="text-red-400 hover:text-red-600 dark:hover:text-red-300 text-lg leading-none"
                                     >
-                                        <span className="text-2xl">{category.icon}</span>
-                                        <span className="text-sm font-medium text-foreground">
-                                            {t(category.labelKey, category.fallback)}
-                                        </span>
-                                    </button>
-                                ))}
-                            </div>
-                        )}
-
-                        {/* Style selection */}
-                        {selectedCategory && !selectedStyle && (
-                            <div className="w-full max-w-lg mb-8 space-y-3">
-                                {selectedCategory.styles.map((style, index) => (
-                                    <button
-                                        key={index}
-                                        onClick={() => handleStyleClick(style)}
-                                        className="w-full text-left px-4 py-4 rounded-xl border border-border bg-card hover:bg-accent hover:border-ring transition-colors"
-                                    >
-                                        <div className="font-medium text-foreground mb-1">{t(style.nameKey)}</div>
-                                        <div className="text-xs text-muted-foreground">{t(style.descKey)}</div>
-                                    </button>
-                                ))}
-                                <button
-                                    onClick={handleBackToCategories}
-                                    className="w-full text-center px-4 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
-                                >
-                                    ← {t('creationBackToCategories', 'Back to categories')}
-                                </button>
-                            </div>
-                        )}
-
-                        {/* Context input for Product/Local */}
-                        {selectedStyle && (
-                            <div className="w-full max-w-lg mb-8 space-y-4">
-                                <input
-                                    ref={contextInputRef}
-                                    type="text"
-                                    value={contextInput}
-                                    onChange={(e) => setContextInput(e.target.value)}
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter') {
-                                            e.preventDefault()
-                                            handleContextSubmit()
-                                        }
-                                    }}
-                                    placeholder={
-                                        selectedCategory?.labelKey === 'creationChipSaaS'
-                                            ? t('creationSaasPlaceholder', 'e.g. Project management for remote teams, AI writing assistant...')
-                                            : selectedCategory?.labelKey === 'creationChipAgency'
-                                                ? t('creationAgencyPlaceholder', 'e.g. Brand identity design, Product photography, Motion graphics...')
-                                                : selectedCategory?.labelKey === 'creationChipProduct'
-                                                    ? t('creationProductPlaceholder', 'e.g. Wireless earbuds, Artisan candles, Fitness app...')
-                                                    : t('creationLocalPlaceholder', 'e.g. Italian trattoria, Craft coffee roaster, Ramen bar...')
-                                    }
-                                    className="w-full px-4 py-3 text-sm bg-card border border-border rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/50 focus:border-ring"
-                                />
-                                <div className="flex gap-2">
-                                    <button
-                                        onClick={handleBackToStyles}
-                                        className="flex-1 px-4 py-2.5 text-sm text-muted-foreground hover:text-foreground border border-border rounded-xl hover:bg-accent transition-colors"
-                                    >
-                                        ← {t('creationBackToStyles', 'Back')}
-                                    </button>
-                                    <button
-                                        onClick={handleContextSubmit}
-                                        disabled={!contextInput.trim()}
-                                        className="flex-1 px-4 py-2.5 text-sm bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                    >
-                                        {t('creationStart', 'Start Building')} →
+                                        ×
                                     </button>
                                 </div>
                             </div>
                         )}
+
+                        {/* Header */}
+                        <div className="text-center mb-6 space-y-3">
+                            <h1 className="text-3xl font-semibold text-foreground tracking-tight">
+                                {t('creationHeading', 'What would you like to build?')}
+                            </h1>
+                        </div>
+
+                        {/* Tab switcher */}
+                        <div className="flex gap-1 p-1 bg-muted rounded-lg mb-8">
+                            <button
+                                onClick={() => {
+                                    setCreationMode('template')
+                                    setSelectedCategory(null)
+                                    setSelectedStyle(null)
+                                    setContextInput('')
+                                }}
+                                className={cn(
+                                    "px-4 py-2 text-sm font-medium rounded-md transition-colors",
+                                    creationMode === 'template'
+                                        ? "bg-background text-foreground shadow-sm"
+                                        : "text-muted-foreground hover:text-foreground"
+                                )}
+                            >
+                                {t('creationTabTemplate', 'Use a template')}
+                            </button>
+                            <button
+                                onClick={() => setCreationMode('custom')}
+                                className={cn(
+                                    "px-4 py-2 text-sm font-medium rounded-md transition-colors",
+                                    creationMode === 'custom'
+                                        ? "bg-background text-foreground shadow-sm"
+                                        : "text-muted-foreground hover:text-foreground"
+                                )}
+                            >
+                                {t('creationTabCustom', 'Write your own')}
+                            </button>
+                        </div>
+
+                        {/* Template flow */}
+                        {creationMode === 'template' && (
+                            <div className="w-full flex flex-col items-center">
+                                {/* Subheading for template mode */}
+                                {!selectedCategory && !selectedStyle && (
+                                    <p className="text-sm text-muted-foreground text-center mb-6">
+                                        {t('creationTemplateSubheading', 'Choose a category to generate a detailed design prompt.')}
+                                    </p>
+                                )}
+
+                                {/* Dynamic subheading during wizard */}
+                                {(selectedCategory || selectedStyle) && (
+                                    <p className="text-sm text-muted-foreground text-center mb-6">
+                                        {selectedStyle
+                                            ? (selectedCategory?.labelKey === 'creationChipSaaS'
+                                                ? t('creationSaasQuestion', 'What does your product do?')
+                                                : selectedCategory?.labelKey === 'creationChipAgency'
+                                                    ? t('creationAgencyQuestion', 'What do you create?')
+                                                    : selectedCategory?.labelKey === 'creationChipProduct'
+                                                        ? t('creationProductQuestion', 'What are you selling?')
+                                                        : t('creationLocalQuestion', 'What type of establishment?'))
+                                            : `${t(selectedCategory?.labelKey || '', selectedCategory?.fallback)} · ${t('creationChooseStyle', 'Choose a design style')}`
+                                        }
+                                    </p>
+                                )}
+
+                                {/* Category selection */}
+                                {!selectedCategory && (
+                                    <div className="grid grid-cols-2 gap-3 w-full max-w-md">
+                                        {CREATION_CATEGORIES.map((category) => {
+                                            const IconComponent = CATEGORY_ICONS[category.iconKey]
+                                            return (
+                                                <button
+                                                    key={category.labelKey}
+                                                    onClick={() => handleCategoryClick(category)}
+                                                    className="flex flex-col items-center gap-3 px-4 py-5 rounded-xl border border-border bg-card hover:bg-accent hover:border-ring transition-colors text-center"
+                                                >
+                                                    <IconComponent className="w-6 h-6 text-muted-foreground" />
+                                                    <span className="text-sm font-medium text-foreground">
+                                                        {t(category.labelKey, category.fallback)}
+                                                    </span>
+                                                </button>
+                                            )
+                                        })}
+                                    </div>
+                                )}
+
+                                {/* Style selection */}
+                                {selectedCategory && !selectedStyle && (
+                                    <div className="w-full max-w-lg space-y-3">
+                                        {selectedCategory.styles.map((style, index) => (
+                                            <button
+                                                key={index}
+                                                onClick={() => handleStyleClick(style)}
+                                                className="w-full text-left px-4 py-4 rounded-xl border border-border bg-card hover:bg-accent hover:border-ring transition-colors"
+                                            >
+                                                <div className="font-medium text-foreground mb-1">{t(style.nameKey)}</div>
+                                                <div className="text-xs text-muted-foreground">{t(style.descKey)}</div>
+                                            </button>
+                                        ))}
+                                        <button
+                                            onClick={handleBackToCategories}
+                                            className="w-full text-center px-4 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                                        >
+                                            ← {t('creationBackToCategories', 'Back to categories')}
+                                        </button>
+                                    </div>
+                                )}
+
+                                {/* Context input */}
+                                {selectedStyle && (
+                                    <div className="w-full max-w-lg space-y-4">
+                                        <div className="text-xs text-muted-foreground text-center mb-2">
+                                            {t(selectedStyle.nameKey)} · {t(selectedCategory?.labelKey || '', selectedCategory?.fallback)}
+                                        </div>
+                                        <input
+                                            ref={contextInputRef}
+                                            type="text"
+                                            value={contextInput}
+                                            onChange={(e) => setContextInput(e.target.value)}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter') {
+                                                    e.preventDefault()
+                                                    handleContextSubmit()
+                                                }
+                                            }}
+                                            placeholder={
+                                                selectedCategory?.labelKey === 'creationChipSaaS'
+                                                    ? t('creationSaasPlaceholder', 'e.g. Project management for remote teams, AI writing assistant...')
+                                                    : selectedCategory?.labelKey === 'creationChipAgency'
+                                                        ? t('creationAgencyPlaceholder', 'e.g. Brand identity design, Product photography, Motion graphics...')
+                                                        : selectedCategory?.labelKey === 'creationChipProduct'
+                                                            ? t('creationProductPlaceholder', 'e.g. Wireless earbuds, Artisan candles, Fitness app...')
+                                                            : t('creationLocalPlaceholder', 'e.g. Italian trattoria, Craft coffee roaster, Ramen bar...')
+                                            }
+                                            className="w-full px-4 py-3 text-sm bg-card border border-border rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/50 focus:border-ring"
+                                        />
+                                        <div className="flex gap-2">
+                                            <button
+                                                onClick={handleBackToStyles}
+                                                className="flex-1 px-4 py-2.5 text-sm text-muted-foreground hover:text-foreground border border-border rounded-xl hover:bg-accent transition-colors"
+                                            >
+                                                ← {t('creationBackToStyles', 'Back')}
+                                            </button>
+                                            <button
+                                                onClick={handleContextSubmit}
+                                                disabled={!contextInput.trim()}
+                                                className="flex-1 px-4 py-2.5 text-sm bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                            >
+                                                {t('creationGeneratePrompt', 'Generate Prompt')} →
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Custom prompt flow */}
+                        {creationMode === 'custom' && (
+                            <div className="w-full flex flex-col items-center">
+                                <p className="text-sm text-muted-foreground text-center mb-6">
+                                    {t('creationCustomSubheading', 'Describe what you want to build in your own words.')}
+                                </p>
+                                <div className="w-full max-w-lg">
+                                    <div className="flex gap-2 items-end">
+                                        <div className="flex-1 bg-card border border-border rounded-xl focus-within:ring-2 focus-within:ring-ring/50 focus-within:border-ring">
+                                            <textarea
+                                                ref={inputRef}
+                                                value={input}
+                                                onChange={(e) => setInput(e.target.value)}
+                                                onKeyDown={handleKeyDown}
+                                                placeholder={t('creationPlaceholder', 'Describe what you want to build...')}
+                                                className="w-full px-4 py-3 text-sm bg-transparent text-foreground placeholder:text-muted-foreground focus:outline-none resize-none"
+                                                rows={5}
+                                                style={{ minHeight: '120px', maxHeight: '240px' }}
+                                            />
+                                        </div>
+                                        <Button
+                                            onClick={() => handleSubmit()}
+                                            disabled={!input.trim()}
+                                            className="bg-primary hover:bg-primary/90 text-primary-foreground h-12 w-12 rounded-xl"
+                                        >
+                                            <Send className="w-5 h-5" />
+                                        </Button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* Step 2b: Review generated prompt */}
+                {phase === 'initial' && modelReady && generatedPrompt && (
+                    <div className="flex-1 flex flex-col items-center justify-center w-full max-w-2xl px-6">
+                        <div className="text-center mb-8 space-y-3">
+                            <h1 className="text-3xl font-semibold text-foreground tracking-tight">
+                                {t('creationReviewPrompt', 'Review your prompt')}
+                            </h1>
+                            <p className="text-sm text-muted-foreground">
+                                {t('creationReviewSubheading', 'Edit the prompt if needed, then start building.')}
+                            </p>
+                        </div>
 
                         <div className="w-full">
                             <div className="flex gap-2 items-end">
                                 <div className="flex-1 bg-card border border-border rounded-xl focus-within:ring-2 focus-within:ring-ring/50 focus-within:border-ring">
                                     <textarea
                                         ref={inputRef}
-                                        value={input}
-                                        onChange={(e) => setInput(e.target.value)}
-                                        onKeyDown={handleKeyDown}
-                                        placeholder={t('creationPlaceholder', 'Describe what you want to build...')}
+                                        value={generatedPrompt}
+                                        onChange={(e) => setGeneratedPrompt(e.target.value)}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter' && !e.shiftKey) {
+                                                e.preventDefault()
+                                                handleSubmit(generatedPrompt || '')
+                                            }
+                                        }}
                                         className="w-full px-4 py-3 text-sm bg-transparent text-foreground placeholder:text-muted-foreground focus:outline-none resize-none"
-                                        rows={3}
-                                        style={{ minHeight: '48px', maxHeight: '160px' }}
+                                        rows={8}
+                                        style={{ minHeight: '160px', maxHeight: '320px' }}
                                     />
                                 </div>
                                 <Button
-                                    onClick={() => handleSubmit()}
-                                    disabled={!input.trim()}
+                                    onClick={() => handleSubmit(generatedPrompt || '')}
+                                    disabled={!generatedPrompt?.trim()}
                                     className="bg-primary hover:bg-primary/90 text-primary-foreground h-12 w-12 rounded-xl"
                                 >
                                     <Send className="w-5 h-5" />
                                 </Button>
                             </div>
+                            <button
+                                onClick={() => setGeneratedPrompt(null)}
+                                className="mt-3 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                            >
+                                ← {t('creationStartOver', 'Start over')}
+                            </button>
                         </div>
                     </div>
                 )}
@@ -584,41 +762,15 @@ export function CreationView({ initialModel, initialModelProvider, onModelChange
                             <div ref={messagesEndRef} />
                         </div>
 
-                        <div className="border-t border-border p-4">
-                            <div className="flex gap-2 items-end">
-                                <div className="flex-1 bg-card border border-border rounded-lg focus-within:ring-2 focus-within:ring-ring/50 focus-within:border-ring">
-                                    <textarea
-                                        ref={inputRef}
-                                        value={input}
-                                        onChange={(e) => setInput(e.target.value)}
-                                        onKeyDown={handleKeyDown}
-                                        placeholder={t('inputPlaceholder')}
-                                        disabled={isLoading && !waitingForInput}
-                                        className={cn(
-                                            "w-full px-4 py-2 text-sm bg-transparent text-foreground placeholder:text-muted-foreground focus:outline-none resize-none",
-                                            isLoading && !waitingForInput && "opacity-50 cursor-not-allowed"
-                                        )}
-                                        rows={1}
-                                        style={{ minHeight: '36px', maxHeight: '120px' }}
-                                    />
-                                </div>
-                                {isLoading || waitingForInput ? (
-                                    <Button
-                                        onClick={stopStream}
-                                        className="bg-red-600 hover:bg-red-700 text-white"
-                                    >
-                                        <Square className="w-3.5 h-3.5" />
-                                    </Button>
-                                ) : (
-                                    <Button
-                                        onClick={() => handleSubmit()}
-                                        disabled={!input.trim()}
-                                        className="bg-primary hover:bg-primary/90 text-primary-foreground"
-                                    >
-                                        <Send className="w-4 h-4" />
-                                    </Button>
-                                )}
-                            </div>
+                        {/* Abort button */}
+                        <div className="shrink-0 border-t border-border p-4 flex justify-center">
+                            <button
+                                onClick={handleAbort}
+                                className="flex items-center gap-2 px-4 py-2 text-sm text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800/50 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+                            >
+                                <Square className="w-3.5 h-3.5" />
+                                <span>{t('creationAbort', 'Cancel')}</span>
+                            </button>
                         </div>
                     </div>
                 )}
