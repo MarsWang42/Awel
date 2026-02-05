@@ -68,6 +68,15 @@ export function createProxyMiddleware(
                     : undefined,
             });
 
+            // Handle null body status codes (204, 304, etc.) - pass through without body
+            const nullBodyStatuses = [101, 204, 205, 304];
+            if (nullBodyStatuses.includes(response.status)) {
+                return new Response(null, {
+                    status: response.status,
+                    headers: response.headers,
+                });
+            }
+
             const contentType = response.headers.get('content-type') || '';
 
             // If it's HTML, inject the Awel host script
