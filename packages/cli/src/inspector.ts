@@ -9,6 +9,10 @@ const inspectorBus = new EventEmitter();
 let bufferedSelection: SelectedElement | null = null;
 let sseClientConnected = false;
 
+// Track active SSE connection so we can close old ones when a new client connects.
+// This prevents connection exhaustion when the browser refreshes the page repeatedly.
+let activeAbortController: AbortController | null = null;
+
 /**
  * Enrich a selection with server-side context:
  * - Source code snippet around the target line
@@ -89,6 +93,16 @@ export function createInspectorRoute(projectCwd: string) {
 
     // Dashboard connects here to receive selections in real time
     inspector.get('/api/inspector/events', (c) => {
+        // Close any existing SSE connection before opening a new one.
+        // This prevents connection exhaustion on page refresh.
+        if (activeAbortController) {
+            activeAbortController.abort();
+            activeAbortController = null;
+        }
+
+        const abortController = new AbortController();
+        activeAbortController = abortController;
+
         return streamSSE(c, async (stream) => {
             sseClientConnected = true;
 
@@ -112,15 +126,26 @@ export function createInspectorRoute(projectCwd: string) {
                 }
             };
 
+            const cleanup = () => {
+                sseClientConnected = false;
+                inspectorBus.removeListener('selection', onSelection);
+                if (activeAbortController === abortController) {
+                    activeAbortController = null;
+                }
+            };
+
             inspectorBus.on('selection', onSelection);
 
-            // Keep the stream open until the client disconnects
+            // Listen for abort from both client disconnect and server-side abort
+            abortController.signal.addEventListener('abort', cleanup);
+
+            // Keep the stream open until the client disconnects or we abort
             await new Promise<void>((resolve) => {
                 stream.onAbort(() => {
-                    sseClientConnected = false;
-                    inspectorBus.removeListener('selection', onSelection);
+                    cleanup();
                     resolve();
                 });
+                abortController.signal.addEventListener('abort', () => resolve());
             });
         });
     });
