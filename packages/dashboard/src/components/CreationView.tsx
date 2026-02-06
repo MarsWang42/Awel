@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Send, Loader2, Sparkles, Sun, Moon, Rocket, Palette, Package, UtensilsCrossed, Square } from 'lucide-react'
+import { Send, Loader2, Sparkles, Sun, Moon, Rocket, Palette, Package, UtensilsCrossed, Square, BarChart3, Settings, Users, ShoppingCart, ImagePlus, X } from 'lucide-react'
 import { Button } from './ui/button'
+import { ImagePreviewModal } from './ImagePreviewModal'
 import { ModelSelector } from './ModelSelector'
 import { useConsole } from '../hooks/useConsole'
 import { useTheme } from '../hooks/useTheme'
@@ -24,7 +25,11 @@ interface StyleOption {
 interface CategoryOption {
     labelKey: string
     fallback: string
-    iconKey: 'rocket' | 'palette' | 'package' | 'utensils'
+    iconKey: 'rocket' | 'palette' | 'package' | 'utensils' | 'bar-chart' | 'settings' | 'users' | 'shopping-cart'
+    questionKey: string
+    questionFallback: string
+    placeholderKey: string
+    placeholderFallback: string
     styles: StyleOption[]
 }
 
@@ -33,6 +38,10 @@ const CATEGORY_ICONS = {
     palette: Palette,
     package: Package,
     utensils: UtensilsCrossed,
+    'bar-chart': BarChart3,
+    settings: Settings,
+    users: Users,
+    'shopping-cart': ShoppingCart,
 }
 
 const CREATION_CATEGORIES: CategoryOption[] = [
@@ -40,6 +49,10 @@ const CREATION_CATEGORIES: CategoryOption[] = [
         labelKey: 'creationChipSaaS',
         fallback: 'SaaS Landing Page',
         iconKey: 'rocket',
+        questionKey: 'creationSaasQuestion',
+        questionFallback: 'What does your product do?',
+        placeholderKey: 'creationSaasPlaceholder',
+        placeholderFallback: 'e.g. Project management for remote teams, AI writing assistant...',
         styles: [
             { nameKey: 'styleSaasGradientName', descKey: 'styleSaasGradientDesc', promptKey: 'promptSaasGradient' },
             { nameKey: 'styleSaasDarkName', descKey: 'styleSaasDarkDesc', promptKey: 'promptSaasDark' },
@@ -50,6 +63,10 @@ const CREATION_CATEGORIES: CategoryOption[] = [
         labelKey: 'creationChipAgency',
         fallback: 'Creative Portfolio',
         iconKey: 'palette',
+        questionKey: 'creationAgencyQuestion',
+        questionFallback: 'What do you create?',
+        placeholderKey: 'creationAgencyPlaceholder',
+        placeholderFallback: 'e.g. Brand identity design, Product photography, Motion graphics...',
         styles: [
             { nameKey: 'styleAgencyEditorialName', descKey: 'styleAgencyEditorialDesc', promptKey: 'promptAgencyEditorial' },
             { nameKey: 'styleAgencyBrutalistName', descKey: 'styleAgencyBrutalistDesc', promptKey: 'promptAgencyBrutalist' },
@@ -60,6 +77,10 @@ const CREATION_CATEGORIES: CategoryOption[] = [
         labelKey: 'creationChipProduct',
         fallback: 'Product Showcase',
         iconKey: 'package',
+        questionKey: 'creationProductQuestion',
+        questionFallback: 'What are you selling?',
+        placeholderKey: 'creationProductPlaceholder',
+        placeholderFallback: 'e.g. Wireless earbuds, Artisan candles, Fitness app...',
         styles: [
             { nameKey: 'styleProductLuxuryName', descKey: 'styleProductLuxuryDesc', promptKey: 'promptProductLuxury' },
             { nameKey: 'styleProductGlassName', descKey: 'styleProductGlassDesc', promptKey: 'promptProductGlass' },
@@ -70,10 +91,70 @@ const CREATION_CATEGORIES: CategoryOption[] = [
         labelKey: 'creationChipLocal',
         fallback: 'Restaurant & Local',
         iconKey: 'utensils',
+        questionKey: 'creationLocalQuestion',
+        questionFallback: 'What type of establishment?',
+        placeholderKey: 'creationLocalPlaceholder',
+        placeholderFallback: 'e.g. Italian trattoria, Craft coffee roaster, Ramen bar...',
         styles: [
             { nameKey: 'styleLocalWarmName', descKey: 'styleLocalWarmDesc', promptKey: 'promptLocalWarm' },
             { nameKey: 'styleLocalModernName', descKey: 'styleLocalModernDesc', promptKey: 'promptLocalModern' },
             { nameKey: 'styleLocalRusticName', descKey: 'styleLocalRusticDesc', promptKey: 'promptLocalRustic' }
+        ]
+    },
+    {
+        labelKey: 'creationChipAnalytics',
+        fallback: 'Analytics Dashboard',
+        iconKey: 'bar-chart',
+        questionKey: 'creationAnalyticsQuestion',
+        questionFallback: 'What metrics do you track?',
+        placeholderKey: 'creationAnalyticsPlaceholder',
+        placeholderFallback: 'e.g. User engagement, Revenue analytics, Server monitoring...',
+        styles: [
+            { nameKey: 'styleAnalyticsDarkName', descKey: 'styleAnalyticsDarkDesc', promptKey: 'promptAnalyticsDark' },
+            { nameKey: 'styleAnalyticsCleanName', descKey: 'styleAnalyticsCleanDesc', promptKey: 'promptAnalyticsClean' },
+            { nameKey: 'styleAnalyticsColorfulName', descKey: 'styleAnalyticsColorfulDesc', promptKey: 'promptAnalyticsColorful' }
+        ]
+    },
+    {
+        labelKey: 'creationChipAdmin',
+        fallback: 'Admin Panel',
+        iconKey: 'settings',
+        questionKey: 'creationAdminQuestion',
+        questionFallback: 'What does your admin panel manage?',
+        placeholderKey: 'creationAdminPlaceholder',
+        placeholderFallback: 'e.g. User accounts, Content, Settings, Permissions...',
+        styles: [
+            { nameKey: 'styleAdminSidebarName', descKey: 'styleAdminSidebarDesc', promptKey: 'promptAdminSidebar' },
+            { nameKey: 'styleAdminCompactName', descKey: 'styleAdminCompactDesc', promptKey: 'promptAdminCompact' },
+            { nameKey: 'styleAdminFriendlyName', descKey: 'styleAdminFriendlyDesc', promptKey: 'promptAdminFriendly' }
+        ]
+    },
+    {
+        labelKey: 'creationChipCRM',
+        fallback: 'CRM Dashboard',
+        iconKey: 'users',
+        questionKey: 'creationCRMQuestion',
+        questionFallback: 'What does your CRM track?',
+        placeholderKey: 'creationCRMPlaceholder',
+        placeholderFallback: 'e.g. Sales leads, Customer accounts, Deal pipeline...',
+        styles: [
+            { nameKey: 'styleCRMPipelineName', descKey: 'styleCRMPipelineDesc', promptKey: 'promptCRMPipeline' },
+            { nameKey: 'styleCRMCardName', descKey: 'styleCRMCardDesc', promptKey: 'promptCRMCard' },
+            { nameKey: 'styleCRMTableName', descKey: 'styleCRMTableDesc', promptKey: 'promptCRMTable' }
+        ]
+    },
+    {
+        labelKey: 'creationChipEcommerce',
+        fallback: 'E-commerce Dashboard',
+        iconKey: 'shopping-cart',
+        questionKey: 'creationEcommerceQuestion',
+        questionFallback: 'What does your store sell?',
+        placeholderKey: 'creationEcommercePlaceholder',
+        placeholderFallback: 'e.g. Fashion apparel, Electronics, Handmade crafts...',
+        styles: [
+            { nameKey: 'styleEcomCleanName', descKey: 'styleEcomCleanDesc', promptKey: 'promptEcomClean' },
+            { nameKey: 'styleEcomDarkName', descKey: 'styleEcomDarkDesc', promptKey: 'promptEcomDark' },
+            { nameKey: 'styleEcomPlayfulName', descKey: 'styleEcomPlayfulDesc', promptKey: 'promptEcomPlayful' }
         ]
     }
 ]
@@ -120,8 +201,12 @@ export function CreationView({ initialModel, initialModelProvider, onModelChange
     const [errorMessage, setErrorMessage] = useState<string | null>(null)
     const [generatedPrompt, setGeneratedPrompt] = useState<string | null>(null)
     const [creationMode, setCreationMode] = useState<'template' | 'custom'>('template')
+    const [imageAttachments, setImageAttachments] = useState<{ dataUrl: string; mediaType: string; name: string }[]>([])
+    const [previewImages, setPreviewImages] = useState<string[] | null>(null)
+    const [previewIndex, setPreviewIndex] = useState(0)
     const inputRef = useRef<HTMLTextAreaElement>(null)
     const contextInputRef = useRef<HTMLInputElement>(null)
+    const fileInputRef = useRef<HTMLInputElement>(null)
     const messagesEndRef = useRef<HTMLDivElement>(null)
 
     const {
@@ -156,10 +241,13 @@ export function CreationView({ initialModel, initialModelProvider, onModelChange
         const lastError = [...messages].reverse().find(m => m.type === 'error')
         const lastResult = [...messages].reverse().find(m => m.type === 'result')
 
-        // Handle error case - show error and return to initial phase
+        // Handle error case - show error and return to initial phase.
+        // Clear messages so the "messages exist → building" effect doesn't
+        // immediately flip phase back to 'building', causing a flicker loop.
         if (lastError && !isLoading) {
             const errorMsg = lastError.message || t('creationError', 'Something went wrong. Please try again.')
             setErrorMessage(errorMsg)
+            clearMessages()
             setPhase('initial')
             return
         }
@@ -168,6 +256,7 @@ export function CreationView({ initialModel, initialModelProvider, onModelChange
         if (lastResult && lastResult.isError && !isLoading) {
             const errorMsg = lastResult.result || t('creationError', 'Something went wrong. Please try again.')
             setErrorMessage(errorMsg)
+            clearMessages()
             setPhase('initial')
             return
         }
@@ -185,6 +274,7 @@ export function CreationView({ initialModel, initialModelProvider, onModelChange
                         duration: lastResult.durationMs,
                         inputTokens: lastResult.inputTokens,
                         outputTokens: lastResult.outputTokens,
+                        cacheReadTokens: lastResult.cacheReadTokens,
                     }),
                 })
                     .then(r => r.json())
@@ -201,7 +291,7 @@ export function CreationView({ initialModel, initialModelProvider, onModelChange
                 window.location.href = '/'
             }, 3000)
         }
-    }, [messages, phase, isLoading, t])
+    }, [messages, phase, isLoading, t, clearMessages])
 
     // Auto-scroll messages
     useEffect(() => {
@@ -251,9 +341,12 @@ export function CreationView({ initialModel, initialModelProvider, onModelChange
                         }
                     } catch { /* ignore storage errors */ }
 
-                    if (shouldAutoSubmit && data.originalPrompt) {
-                        // Queue the prompt for auto-submit after model state is updated
-                        setPendingAutoSubmit(data.originalPrompt)
+                    if (shouldAutoSubmit) {
+                        // Use the active run's prompt (may differ from originalPrompt if edited)
+                        const promptToUse = activeRun.prompt || data.originalPrompt
+                        if (promptToUse) {
+                            setPendingAutoSubmit(promptToUse)
+                        }
                     }
                 }
             }
@@ -320,8 +413,10 @@ export function CreationView({ initialModel, initialModelProvider, onModelChange
             }
         }
 
-        submitMessage(prompt)
-    }, [input, isLoading, submitMessage, comparisonState, selectedModel, selectedModelProvider, providers])
+        const imageDataUrls = imageAttachments.map(a => a.dataUrl)
+        setImageAttachments([])
+        submitMessage(prompt, imageDataUrls.length > 0 ? { imageDataUrls } : undefined)
+    }, [input, isLoading, submitMessage, comparisonState, selectedModel, selectedModelProvider, providers, imageAttachments])
 
     const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
         if (e.key === 'Enter' && !e.shiftKey) {
@@ -355,7 +450,7 @@ export function CreationView({ initialModel, initialModelProvider, onModelChange
         setContextInput('')
     }, [selectedStyle, contextInput, t])
 
-    const handleBackToCategories = useCallback(() => {
+    const resetWizard = useCallback(() => {
         setSelectedCategory(null)
         setSelectedStyle(null)
         setContextInput('')
@@ -365,6 +460,8 @@ export function CreationView({ initialModel, initialModelProvider, onModelChange
         setSelectedStyle(null)
         setContextInput('')
     }, [])
+
+    const availableProviders = providers.filter(p => p.available && p.models.length > 0)
 
     const handleToggleTheme = () => {
         setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')
@@ -386,6 +483,28 @@ export function CreationView({ initialModel, initialModelProvider, onModelChange
         setComparisonState(null)
         setPhase('initial')
     }, [stopStream, clearMessages])
+
+    const handleImageAttach = useCallback(() => {
+        fileInputRef.current?.click()
+    }, [])
+
+    const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+        const files = e.target.files
+        if (!files || files.length === 0) return
+        for (const file of Array.from(files)) {
+            const reader = new FileReader()
+            reader.onload = () => {
+                const dataUrl = reader.result as string
+                setImageAttachments(prev => [...prev, { dataUrl, mediaType: file.type, name: file.name }])
+            }
+            reader.readAsDataURL(file)
+        }
+        e.target.value = ''
+    }, [])
+
+    const removeImageAttachment = useCallback((index: number) => {
+        setImageAttachments(prev => prev.filter((_, i) => i !== index))
+    }, [])
 
     // ─── Success State ──────────────────────────────────────
     if (phase === 'success') {
@@ -458,12 +577,12 @@ export function CreationView({ initialModel, initialModelProvider, onModelChange
                             {t('chooseModelFirst', 'Choose a model to get started.')}
                         </p>
 
-                        {providers.filter(p => p.available && p.models.length > 0).length === 0 && providers.length > 0 && (
+                        {availableProviders.length === 0 && providers.length > 0 && (
                             <p className="text-xs text-muted-foreground">{t('noModelsAvailable', 'No models available. Configure a provider to continue.')}</p>
                         )}
 
                         <div className="w-full space-y-4">
-                            {providers.filter(p => p.available && p.models.length > 0).map(provider => (
+                            {availableProviders.map(provider => (
                                 <div key={provider.id}>
                                     <div className={cn("text-[10px] font-medium uppercase tracking-wider mb-1.5 px-1", provider.color || "text-muted-foreground")}>
                                         {provider.label}
@@ -523,9 +642,7 @@ export function CreationView({ initialModel, initialModelProvider, onModelChange
                             <button
                                 onClick={() => {
                                     setCreationMode('template')
-                                    setSelectedCategory(null)
-                                    setSelectedStyle(null)
-                                    setContextInput('')
+                                    resetWizard()
                                 }}
                                 className={cn(
                                     "px-4 py-2 text-sm font-medium rounded-md transition-colors",
@@ -563,21 +680,15 @@ export function CreationView({ initialModel, initialModelProvider, onModelChange
                                 {(selectedCategory || selectedStyle) && (
                                     <p className="text-sm text-muted-foreground text-center mb-6">
                                         {selectedStyle
-                                            ? (selectedCategory?.labelKey === 'creationChipSaaS'
-                                                ? t('creationSaasQuestion', 'What does your product do?')
-                                                : selectedCategory?.labelKey === 'creationChipAgency'
-                                                    ? t('creationAgencyQuestion', 'What do you create?')
-                                                    : selectedCategory?.labelKey === 'creationChipProduct'
-                                                        ? t('creationProductQuestion', 'What are you selling?')
-                                                        : t('creationLocalQuestion', 'What type of establishment?'))
-                                            : `${t(selectedCategory?.labelKey || '', selectedCategory?.fallback)} · ${t('creationChooseStyle', 'Choose a design style')}`
+                                            ? t(selectedCategory!.questionKey, selectedCategory!.questionFallback)
+                                            : `${t(selectedCategory!.labelKey, selectedCategory!.fallback)} · ${t('creationChooseStyle', 'Choose a design style')}`
                                         }
                                     </p>
                                 )}
 
                                 {/* Category selection */}
                                 {!selectedCategory && (
-                                    <div className="grid grid-cols-2 gap-3 w-full max-w-md">
+                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 w-full max-w-2xl">
                                         {CREATION_CATEGORIES.map((category) => {
                                             const IconComponent = CATEGORY_ICONS[category.iconKey]
                                             return (
@@ -610,7 +721,7 @@ export function CreationView({ initialModel, initialModelProvider, onModelChange
                                             </button>
                                         ))}
                                         <button
-                                            onClick={handleBackToCategories}
+                                            onClick={resetWizard}
                                             className="w-full text-center px-4 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
                                         >
                                             ← {t('creationBackToCategories', 'Back to categories')}
@@ -635,15 +746,7 @@ export function CreationView({ initialModel, initialModelProvider, onModelChange
                                                     handleContextSubmit()
                                                 }
                                             }}
-                                            placeholder={
-                                                selectedCategory?.labelKey === 'creationChipSaaS'
-                                                    ? t('creationSaasPlaceholder', 'e.g. Project management for remote teams, AI writing assistant...')
-                                                    : selectedCategory?.labelKey === 'creationChipAgency'
-                                                        ? t('creationAgencyPlaceholder', 'e.g. Brand identity design, Product photography, Motion graphics...')
-                                                        : selectedCategory?.labelKey === 'creationChipProduct'
-                                                            ? t('creationProductPlaceholder', 'e.g. Wireless earbuds, Artisan candles, Fitness app...')
-                                                            : t('creationLocalPlaceholder', 'e.g. Italian trattoria, Craft coffee roaster, Ramen bar...')
-                                            }
+                                            placeholder={t(selectedCategory!.placeholderKey, selectedCategory!.placeholderFallback)}
                                             className="w-full px-4 py-3 text-sm bg-card border border-border rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/50 focus:border-ring"
                                         />
                                         <div className="flex gap-2">
@@ -673,6 +776,26 @@ export function CreationView({ initialModel, initialModelProvider, onModelChange
                                     {t('creationCustomSubheading', 'Describe what you want to build in your own words.')}
                                 </p>
                                 <div className="w-full max-w-lg">
+                                    {imageAttachments.length > 0 && (
+                                        <div className="mb-2 flex flex-wrap gap-2">
+                                            {imageAttachments.map((img, i) => (
+                                                <div key={i} className="relative group" title={img.name}>
+                                                    <img
+                                                        src={img.dataUrl}
+                                                        alt={img.name}
+                                                        className="w-10 h-10 rounded-lg border border-border/50 object-cover cursor-pointer hover:opacity-80 transition-opacity"
+                                                        onClick={() => { setPreviewImages(imageAttachments.map(a => a.dataUrl)); setPreviewIndex(i) }}
+                                                    />
+                                                    <button
+                                                        onClick={() => removeImageAttachment(i)}
+                                                        className="absolute -top-1.5 -right-1.5 hidden group-hover:flex items-center justify-center w-4 h-4 rounded-full bg-muted text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+                                                    >
+                                                        <X className="w-2.5 h-2.5" />
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
                                     <div className="flex gap-2 items-end">
                                         <div className="flex-1 bg-card border border-border rounded-xl focus-within:ring-2 focus-within:ring-ring/50 focus-within:border-ring">
                                             <textarea
@@ -685,6 +808,22 @@ export function CreationView({ initialModel, initialModelProvider, onModelChange
                                                 rows={5}
                                                 style={{ minHeight: '120px', maxHeight: '240px' }}
                                             />
+                                            <div className="flex items-center px-3 pb-2">
+                                                <button
+                                                    type="button"
+                                                    onClick={handleImageAttach}
+                                                    className={cn(
+                                                        "shrink-0 p-1 rounded transition-colors",
+                                                        imageAttachments.length > 0 ? "text-blue-600 dark:text-blue-400" : "text-muted-foreground hover:text-foreground"
+                                                    )}
+                                                    title={t('creationAddInspiration', 'Add inspiration image')}
+                                                >
+                                                    <ImagePlus className="w-4 h-4" />
+                                                </button>
+                                                <span className="ml-1.5 text-xs text-muted-foreground">
+                                                    {t('creationAddInspirationDesc', 'Add an inspiration image')}
+                                                </span>
+                                            </div>
                                         </div>
                                         <Button
                                             onClick={() => handleSubmit()}
@@ -713,6 +852,26 @@ export function CreationView({ initialModel, initialModelProvider, onModelChange
                         </div>
 
                         <div className="w-full">
+                            {imageAttachments.length > 0 && (
+                                <div className="mb-2 flex flex-wrap gap-2">
+                                    {imageAttachments.map((img, i) => (
+                                        <div key={i} className="relative group" title={img.name}>
+                                            <img
+                                                src={img.dataUrl}
+                                                alt={img.name}
+                                                className="w-10 h-10 rounded-lg border border-border/50 object-cover cursor-pointer hover:opacity-80 transition-opacity"
+                                                onClick={() => { setPreviewImages(imageAttachments.map(a => a.dataUrl)); setPreviewIndex(i) }}
+                                            />
+                                            <button
+                                                onClick={() => removeImageAttachment(i)}
+                                                className="absolute -top-1.5 -right-1.5 hidden group-hover:flex items-center justify-center w-4 h-4 rounded-full bg-muted text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+                                            >
+                                                <X className="w-2.5 h-2.5" />
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                             <div className="flex gap-2 items-end">
                                 <div className="flex-1 bg-card border border-border rounded-xl focus-within:ring-2 focus-within:ring-ring/50 focus-within:border-ring">
                                     <textarea
@@ -729,6 +888,22 @@ export function CreationView({ initialModel, initialModelProvider, onModelChange
                                         rows={8}
                                         style={{ minHeight: '160px', maxHeight: '320px' }}
                                     />
+                                    <div className="flex items-center px-3 pb-2">
+                                        <button
+                                            type="button"
+                                            onClick={handleImageAttach}
+                                            className={cn(
+                                                "shrink-0 p-1 rounded transition-colors",
+                                                imageAttachments.length > 0 ? "text-blue-600 dark:text-blue-400" : "text-muted-foreground hover:text-foreground"
+                                            )}
+                                            title={t('creationAddInspiration', 'Add inspiration image')}
+                                        >
+                                            <ImagePlus className="w-4 h-4" />
+                                        </button>
+                                        <span className="ml-1.5 text-xs text-muted-foreground">
+                                            {t('creationAddInspirationDesc', 'Add an inspiration image')}
+                                        </span>
+                                    </div>
                                 </div>
                                 <Button
                                     onClick={() => handleSubmit(generatedPrompt || '')}
@@ -775,6 +950,26 @@ export function CreationView({ initialModel, initialModelProvider, onModelChange
                     </div>
                 )}
             </div>
+
+            {/* Hidden file input for image uploads */}
+            <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={handleFileChange}
+                className="hidden"
+            />
+
+            {/* Image preview modal */}
+            {previewImages && (
+                <ImagePreviewModal
+                    images={previewImages}
+                    currentIndex={previewIndex}
+                    onClose={() => setPreviewImages(null)}
+                    onNavigate={setPreviewIndex}
+                />
+            )}
         </div>
     )
 }

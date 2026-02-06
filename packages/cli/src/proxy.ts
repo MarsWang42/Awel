@@ -126,6 +126,12 @@ export function createProxyMiddleware(
             responseHeaders.delete('content-encoding');
             responseHeaders.delete('content-length');
 
+            // In comparison mode, prevent browser caching of CSS/JS assets
+            // to avoid stale styles when switching between branches
+            if (comparisonPhase === 'comparing') {
+                responseHeaders.set('cache-control', 'no-store, must-revalidate');
+            }
+
             return new Response(body, {
                 status: response.status,
                 headers: responseHeaders,

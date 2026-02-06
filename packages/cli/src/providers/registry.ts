@@ -22,6 +22,7 @@ const PROVIDER_CATALOG: ProviderCatalogEntry[] = [
         color: 'text-orange-600 dark:text-orange-400',
         envVar: 'ANTHROPIC_API_KEY',
         models: [
+            { id: 'claude-opus-4-6', label: 'Claude Opus 4.6' },
             { id: 'claude-sonnet-4-5', label: 'Claude Sonnet 4.5' },
             { id: 'claude-opus-4-5', label: 'Claude Opus 4.5' },
             { id: 'claude-haiku-4-5', label: 'Claude Haiku 4.5' },
@@ -33,6 +34,7 @@ const PROVIDER_CATALOG: ProviderCatalogEntry[] = [
         color: 'text-green-600 dark:text-green-400',
         envVar: 'OPENAI_API_KEY',
         models: [
+            { id: 'gpt-5.3-codex', label: 'GPT-5.3 Codex' },
             { id: 'gpt-5.2-codex', label: 'GPT-5.2 Codex' },
             { id: 'gpt-5.1-codex', label: 'GPT-5.1 Codex' },
             { id: 'gpt-5.2-pro', label: 'GPT-5.2 Pro' },

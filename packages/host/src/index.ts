@@ -66,13 +66,10 @@ function createComparisonOverlay(): void {
         height: 500px;
         z-index: 999999;
         pointer-events: none;
+        transition: width 0.2s ease, height 0.2s ease;
       }
       #awel-comparison-overlay iframe {
-        width: 100%;
-        height: 100%;
-        border: none;
         pointer-events: auto;
-        background: transparent;
       }
     `;
     document.head.appendChild(style);
@@ -84,6 +81,14 @@ function createComparisonOverlay(): void {
   const iframe = document.createElement('iframe');
   // Pass comparison mode via URL parameter since the iframe has its own window
   iframe.src = DASHBOARD_URL + '?mode=comparison';
+  iframe.setAttribute('allowtransparency', 'true');
+  iframe.style.cssText = `
+    width: 100%;
+    height: 100%;
+    border: none;
+    background: transparent;
+    color-scheme: normal;
+  `;
 
   // Store reference when iframe loads
   iframe.addEventListener('load', () => {
@@ -184,15 +189,31 @@ window.addEventListener('message', (event) => {
   if (event.data?.type === 'AWEL_COMPARISON_EXPAND') {
     const overlay = document.getElementById('awel-comparison-overlay');
     if (overlay) {
-      overlay.style.top = '0';
-      overlay.style.height = 'auto';
+      if (event.data.chat) {
+        // Full-height chat mode
+        overlay.style.top = '0';
+        overlay.style.width = '420px';
+        overlay.style.height = 'auto';
+      } else {
+        // Sidebar card mode
+        overlay.style.top = 'auto';
+        overlay.style.width = '420px';
+        overlay.style.height = '500px';
+      }
     }
   }
   if (event.data?.type === 'AWEL_COMPARISON_COLLAPSE') {
+    // Shrink to button size — RESIZE will set exact dimensions
     const overlay = document.getElementById('awel-comparison-overlay');
     if (overlay) {
       overlay.style.top = 'auto';
-      overlay.style.height = '500px';
+    }
+  }
+  if (event.data?.type === 'AWEL_COMPARISON_RESIZE') {
+    const overlay = document.getElementById('awel-comparison-overlay');
+    if (overlay) {
+      overlay.style.width = event.data.width + 'px';
+      overlay.style.height = event.data.height + 'px';
     }
   }
   if (event.data?.type === 'AWEL_NAVIGATE') {

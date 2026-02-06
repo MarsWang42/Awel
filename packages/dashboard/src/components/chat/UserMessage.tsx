@@ -1,5 +1,7 @@
+import { useState, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
-import { XCircle, AlertTriangle } from 'lucide-react'
+import ReactMarkdown from 'react-markdown'
+import { XCircle, AlertTriangle, Copy, Check } from 'lucide-react'
 import { cn } from '../../lib/utils'
 import type { ConsoleEntry, SelectedElement, ContentSegment } from '../../types/messages'
 
@@ -39,11 +41,19 @@ export function UserMessage({
     onImageClick,
 }: UserMessageProps) {
     const { t } = useTranslation()
+    const [copied, setCopied] = useState(false)
     const allImages = imageUrls ?? []
     const hasInlineSegments = contentSegments && contentSegments.length > 0 && attachedElements && attachedElements.length > 0
 
+    const handleCopy = useCallback(() => {
+        navigator.clipboard.writeText(content).then(() => {
+            setCopied(true)
+            setTimeout(() => setCopied(false), 1500)
+        }).catch(() => {})
+    }, [content])
+
     return (
-        <div className="text-foreground bg-muted/50 rounded-lg px-3 py-2 text-sm self-end max-w-[85%]">
+        <div className="text-foreground bg-muted/50 rounded-lg px-3 py-2 text-sm self-end max-w-[85%] relative group">
             {allImages.length > 0 && (
                 <div className="flex flex-wrap gap-2 mb-2">
                     {allImages.map((url, i) => (
@@ -98,7 +108,7 @@ export function UserMessage({
                     })}
                 </span>
             ) : (
-                // Fallback: separate block for element chips, then text
+                // Fallback: separate block for element chips, then markdown-formatted text
                 <>
                     {attachedElements && attachedElements.length > 0 && (
                         <div className="flex flex-wrap gap-1 mb-2">
@@ -107,9 +117,73 @@ export function UserMessage({
                             ))}
                         </div>
                     )}
-                    {content}
+                    <ReactMarkdown
+                        components={{
+                            pre: ({ children }) => (
+                                <pre className="bg-card rounded-lg p-2 overflow-x-auto text-xs my-2">
+                                    {children}
+                                </pre>
+                            ),
+                            code: ({ className, children, ...props }) => {
+                                const isInline = !className
+                                return isInline ? (
+                                    <code className="bg-background/50 px-1 py-0.5 rounded text-xs" {...props}>
+                                        {children}
+                                    </code>
+                                ) : (
+                                    <code className={className} {...props}>
+                                        {children}
+                                    </code>
+                                )
+                            },
+                            a: ({ children, ...props }) => (
+                                <a className="text-muted-foreground hover:text-foreground underline" {...props}>
+                                    {children}
+                                </a>
+                            ),
+                            ul: ({ children }) => (
+                                <ul className="list-disc list-inside space-y-0.5 my-1.5 text-sm">{children}</ul>
+                            ),
+                            ol: ({ children }) => (
+                                <ol className="list-decimal list-inside space-y-0.5 my-1.5 text-sm">{children}</ol>
+                            ),
+                            p: ({ children }) => (
+                                <p className="my-1 leading-relaxed text-sm first:mt-0 last:mb-0">{children}</p>
+                            ),
+                            h1: ({ children }) => (
+                                <h1 className="text-base font-semibold mt-3 mb-1">{children}</h1>
+                            ),
+                            h2: ({ children }) => (
+                                <h2 className="text-sm font-semibold mt-2 mb-1">{children}</h2>
+                            ),
+                            h3: ({ children }) => (
+                                <h3 className="text-sm font-medium mt-1.5 mb-0.5">{children}</h3>
+                            ),
+                            blockquote: ({ children }) => (
+                                <blockquote className="border-l-2 border-border pl-2 my-1.5 text-muted-foreground italic text-sm">
+                                    {children}
+                                </blockquote>
+                            ),
+                            li: ({ children }) => (
+                                <li className="text-sm">{children}</li>
+                            ),
+                        }}
+                    >
+                        {content}
+                    </ReactMarkdown>
                 </>
             )}
+            {/* Copy raw markdown button */}
+            <button
+                onClick={handleCopy}
+                className="absolute bottom-1.5 right-1.5 p-1 rounded text-muted-foreground/0 group-hover:text-muted-foreground hover:!text-foreground hover:bg-background/50 transition-all"
+                title={t('copyMessage', 'Copy message')}
+            >
+                {copied
+                    ? <Check className="w-3 h-3 text-emerald-500" />
+                    : <Copy className="w-3 h-3" />
+                }
+            </button>
         </div>
     )
 }

@@ -160,7 +160,7 @@ export async function startServer({ awelPort, targetPort, projectCwd, fresh }: S
       }
 
       // Subsequent run: create new branch, clear chat history for fresh start
-      const { state, run } = createRun(projectCwd, modelId, modelLabel || modelId, modelProvider, providerLabel || modelProvider);
+      const { state, run } = createRun(projectCwd, modelId, modelLabel || modelId, modelProvider, providerLabel || modelProvider, prompt);
       comparisonPhase = state.phase;
 
       // Clear chat history so the new run starts fresh
@@ -185,6 +185,14 @@ export async function startServer({ awelPort, targetPort, projectCwd, fresh }: S
     try {
       const state = switchRun(projectCwd, runId);
       comparisonPhase = state.phase;
+
+      // Wait for the dev server to detect file changes from the git checkout
+      // and recompile before telling the client to reload
+      await new Promise(r => setTimeout(r, 500));
+      try {
+        await fetch(`http://localhost:${targetPort}`, { signal: AbortSignal.timeout(5000) });
+      } catch { /* dev server may not respond, proceed anyway */ }
+
       return c.json({ success: true, state });
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error';
@@ -215,7 +223,7 @@ export async function startServer({ awelPort, targetPort, projectCwd, fresh }: S
 
   app.post('/api/comparison/runs/:id/complete', async (c) => {
     const runId = c.req.param('id');
-    let body: { success: boolean; duration?: number; inputTokens?: number; outputTokens?: number };
+    let body: { success: boolean; duration?: number; inputTokens?: number; outputTokens?: number; cacheReadTokens?: number };
     try {
       body = await c.req.json();
     } catch {
@@ -223,7 +231,7 @@ export async function startServer({ awelPort, targetPort, projectCwd, fresh }: S
     }
     try {
       const stats = (body.duration !== undefined || body.inputTokens !== undefined || body.outputTokens !== undefined)
-        ? { duration: body.duration, inputTokens: body.inputTokens, outputTokens: body.outputTokens }
+        ? { duration: body.duration, inputTokens: body.inputTokens, outputTokens: body.outputTokens, cacheReadTokens: body.cacheReadTokens }
         : undefined;
       const state = markRunComplete(projectCwd, runId, body.success, stats);
       comparisonPhase = state.phase;

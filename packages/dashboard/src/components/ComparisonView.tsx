@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { MessageSquare, Minimize2, Loader2, ChevronLeft, Sun, Moon, AlertCircle, RotateCcw, Clock, ArrowUp, ArrowDown, FileText } from 'lucide-react'
 import { Button } from './ui/button'
@@ -23,6 +23,7 @@ interface ComparisonRun {
     tokenUsage?: {
         input: number
         output: number
+        cacheRead?: number
     }
 }
 
@@ -54,6 +55,7 @@ export function ComparisonView() {
     const [isLoading, setIsLoading] = useState(false)
     const [reviewDiffs, setReviewDiffs] = useState<FileDiff[] | null>(null)
     const [consoleEntries, setConsoleEntries] = useState<ConsoleEntry[]>([])
+    const buttonsRef = useRef<HTMLDivElement>(null)
 
     // Get active run's model info for chat
     const activeRun = comparisonState?.runs.find(r => r.id === comparisonState.activeRunId)
@@ -115,6 +117,39 @@ export function ComparisonView() {
         window.parent.postMessage({ type: 'AWEL_REQUEST_CONSOLE_ENTRIES' }, '*')
         return () => window.removeEventListener('message', handleMessage)
     }, [])
+
+    // Report iframe dimensions to parent when collapsed (buttons only).
+    // We only use RESIZE for collapsed state because the buttons have a fixed size.
+    // The expanded sidebar card uses max-h-[calc(100vh-48px)] which depends on
+    // the iframe viewport height, creating a circular dependency if we resize the
+    // iframe to match the card.
+    useEffect(() => {
+        if (!comparisonState || !isCollapsed || isChatOpen) return
+
+        const el = buttonsRef.current
+        if (!el) return
+
+        const report = () => {
+            const w = el.offsetWidth
+            const h = el.offsetHeight
+            if (w === 0 && h === 0) return
+            // Add 24px for right/bottom margin (right-6/bottom-6) + 8px for shadow
+            window.parent.postMessage({
+                type: 'AWEL_COMPARISON_RESIZE',
+                width: w + 32,
+                height: h + 32,
+            }, '*')
+        }
+
+        const raf = requestAnimationFrame(report)
+        const observer = new ResizeObserver(report)
+        observer.observe(el)
+
+        return () => {
+            cancelAnimationFrame(raf)
+            observer.disconnect()
+        }
+    }, [isCollapsed, isChatOpen, comparisonState])
 
     const handleSwitchRun = useCallback(async (runId: string) => {
         if (!comparisonState || runId === comparisonState.activeRunId) return
@@ -182,23 +217,28 @@ export function ComparisonView() {
     const handleOpenChat = useCallback(() => {
         setIsChatOpen(true)
         setIsCollapsed(true)
-        // Tell parent to expand iframe for chat
-        window.parent.postMessage({ type: 'AWEL_COMPARISON_EXPAND' }, '*')
+        // Tell parent to expand iframe for full-height chat
+        window.parent.postMessage({ type: 'AWEL_COMPARISON_EXPAND', chat: true }, '*')
     }, [])
 
     const handleCloseChat = useCallback(() => {
         setIsChatOpen(false)
         setIsCollapsed(false)
-        // Tell parent to collapse iframe back to small size
-        window.parent.postMessage({ type: 'AWEL_COMPARISON_COLLAPSE' }, '*')
+        // Tell parent to restore sidebar card size
+        window.parent.postMessage({ type: 'AWEL_COMPARISON_EXPAND' }, '*')
     }, [])
 
     const handleToggleCollapse = useCallback(() => {
         if (isChatOpen) {
-            // Close chat when collapsing from chat view
             setIsChatOpen(false)
         }
-        setIsCollapsed(prev => !prev)
+        setIsCollapsed(prev => {
+            const willCollapse = !prev
+            window.parent.postMessage({
+                type: willCollapse ? 'AWEL_COMPARISON_COLLAPSE' : 'AWEL_COMPARISON_EXPAND'
+            }, '*')
+            return willCollapse
+        })
     }, [isChatOpen])
 
     const handleReviewOpen = useCallback((diffs: FileDiff[]) => {
@@ -476,7 +516,7 @@ export function ComparisonView() {
                                                 <Tooltip text={t('inputTokens', 'Input tokens')} position="top">
                                                     <span className="flex items-center gap-0.5">
                                                         <ArrowUp className="w-3 h-3" />
-                                                        {run.tokenUsage.input.toLocaleString()}
+                                                        {(run.tokenUsage.input - (run.tokenUsage.cacheRead ?? 0)).toLocaleString()}
                                                     </span>
                                                 </Tooltip>
                                                 <Tooltip text={t('outputTokens', 'Output tokens')} position="top">
@@ -542,13 +582,14 @@ export function ComparisonView() {
             </div>
 
             {/* Floating buttons at bottom - always visible */}
-            <div className="fixed bottom-6 right-6 z-[999997] flex items-center gap-1">
+            <div ref={buttonsRef} className="fixed bottom-6 right-6 z-[999997] flex items-center gap-1">
                 <button
                     onClick={() => {
                         if (isChatOpen) {
                             handleCloseChat()
                         } else {
-                            setIsCollapsed(prev => !prev)
+                            setIsCollapsed(false)
+                            window.parent.postMessage({ type: 'AWEL_COMPARISON_EXPAND' }, '*')
                         }
                     }}
                     className={cn(

@@ -17,6 +17,7 @@ export interface ComparisonRun {
     tokenUsage?: {
         input: number;
         output: number;
+        cacheRead?: number;
     };
 }
 
@@ -195,7 +196,8 @@ export function createRun(
     modelId: string,
     modelLabel: string,
     modelProvider: string,
-    providerLabel: string
+    providerLabel: string,
+    prompt?: string
 ): { state: ComparisonState; run: ComparisonRun } {
     const state = getComparisonState(projectCwd);
     if (!state) {
@@ -229,6 +231,8 @@ export function createRun(
     // Create new branch from baseline
     execGit(projectCwd, `checkout -b ${branchName} ${state.baselineRef}`);
 
+    const runPrompt = prompt?.trim() || state.originalPrompt;
+
     const run: ComparisonRun = {
         id: runId,
         branchName,
@@ -237,7 +241,7 @@ export function createRun(
         modelProvider,
         providerLabel,
         status: 'building',
-        prompt: state.originalPrompt,
+        prompt: runPrompt,
         createdAt: new Date().toISOString(),
     };
 
@@ -295,7 +299,7 @@ export function markRunComplete(
     projectCwd: string,
     runId: string,
     success: boolean,
-    stats?: { duration?: number; inputTokens?: number; outputTokens?: number }
+    stats?: { duration?: number; inputTokens?: number; outputTokens?: number; cacheReadTokens?: number }
 ): ComparisonState {
     const state = getComparisonState(projectCwd);
     if (!state) {
@@ -317,6 +321,7 @@ export function markRunComplete(
         run.tokenUsage = {
             input: stats.inputTokens ?? 0,
             output: stats.outputTokens ?? 0,
+            cacheRead: stats.cacheReadTokens,
         };
     }
 
