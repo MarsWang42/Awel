@@ -22,7 +22,7 @@ export interface StreamProvider {
     ): Promise<ResponseMessage[]>;
 }
 
-export type ProviderType = 'claude-code' | 'anthropic' | 'openai' | 'google-ai' | 'vercel-gateway' | 'minimax' | 'zhipu' | 'openrouter' | 'moonshot';
+export type ProviderType = 'claude-code' | 'codex-cli' | 'anthropic' | 'openai' | 'google-ai' | 'vercel-gateway' | 'minimax' | 'zhipu' | 'openrouter' | 'moonshot';
 
 export interface ModelEntry {
     id: string;

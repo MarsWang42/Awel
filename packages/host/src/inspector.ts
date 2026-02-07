@@ -742,14 +742,13 @@ export function setInspectorActive(active: boolean): void {
   if (active) {
     // Remember whether sidebar/overlay was open so we can restore it
     sidebarWasOpen = isSidebarVisible();
-    comparisonOverlayWasVisible = !!(comparisonOverlayEl && comparisonOverlayEl.style.display !== 'none' && comparisonOverlayEl.classList.contains('visible'));
+    comparisonOverlayWasVisible = !!(comparisonOverlayEl && comparisonOverlayEl.style.display !== 'none');
 
     // Hide Awel UI so user can click any element
     if (hostEl) hostEl.style.display = 'none';
     if (sidebarEl) sidebarEl.style.display = 'none';
     if (comparisonHostEl) comparisonHostEl.style.display = 'none';
     if (comparisonOverlayEl) {
-      comparisonOverlayEl.classList.remove('visible');
       comparisonOverlayEl.style.display = 'none';
     }
 
@@ -767,11 +766,6 @@ export function setInspectorActive(active: boolean): void {
     if (comparisonHostEl) comparisonHostEl.style.display = '';
     if (comparisonOverlayEl && comparisonOverlayWasVisible) {
       comparisonOverlayEl.style.display = '';
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          comparisonOverlayEl.classList.add('visible');
-        });
-      });
     }
 
     document.body.style.cursor = '';

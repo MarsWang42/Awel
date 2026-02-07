@@ -244,20 +244,36 @@ export function CreationView({ initialModel, initialModelProvider, onModelChange
         // Handle error case - show error and return to initial phase.
         // Clear messages so the "messages exist → building" effect doesn't
         // immediately flip phase back to 'building', causing a flicker loop.
-        if (lastError && !isLoading) {
-            const errorMsg = lastError.message || t('creationError', 'Something went wrong. Please try again.')
-            setErrorMessage(errorMsg)
-            clearMessages()
-            setPhase('initial')
-            return
-        }
+        const buildError = (() => {
+            if (lastError && !isLoading) {
+                return lastError.message || t('creationError', 'Something went wrong. Please try again.')
+            }
+            if (lastResult && lastResult.isError && !isLoading) {
+                return lastResult.result || t('creationError', 'Something went wrong. Please try again.')
+            }
+            return null
+        })()
 
-        // Handle failed result (e.g., API quota exceeded, timeout)
-        if (lastResult && lastResult.isError && !isLoading) {
-            const errorMsg = lastResult.result || t('creationError', 'Something went wrong. Please try again.')
-            setErrorMessage(errorMsg)
-            clearMessages()
+        if (buildError) {
+            // Abort the current run. If there are previous runs the server
+            // removes only this run and switches back to comparing mode;
+            // otherwise it tears everything down.
             setPhase('initial')
+            clearMessages()
+            fetch('/api/comparison/abort', { method: 'POST' })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.comparing) {
+                        window.location.href = '/'
+                    } else {
+                        setErrorMessage(buildError)
+                        setComparisonState(null)
+                    }
+                })
+                .catch(() => {
+                    setErrorMessage(buildError)
+                    setComparisonState(null)
+                })
             return
         }
 
@@ -471,14 +487,20 @@ export function CreationView({ initialModel, initialModelProvider, onModelChange
         // Stop the stream
         stopStream()
 
-        // Abort comparison mode (cleans up branches, state file, and chat history)
+        // Abort the current run. If there are previous runs the server
+        // removes only this run and switches back to comparing mode.
         try {
-            await fetch('/api/comparison/abort', { method: 'POST' })
+            const res = await fetch('/api/comparison/abort', { method: 'POST' })
+            const data = await res.json()
+            if (data.comparing) {
+                window.location.href = '/'
+                return
+            }
         } catch {
             // Ignore errors during cleanup
         }
 
-        // Reset to initial state
+        // First run or full teardown — reset to initial state
         clearMessages()
         setComparisonState(null)
         setPhase('initial')

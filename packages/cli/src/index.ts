@@ -47,10 +47,12 @@ program
     .command('dev')
     .description('Start the development server with Awel overlay')
     .option('-p, --port <port>', 'Port for target app', String(USER_APP_PORT))
+    .option('-a, --awel-port <port>', 'Port for Awel server', String(AWEL_PORT))
     .option('-v, --verbose', 'Print all LLM stream events to stderr')
     .option('--no-open', 'Do not open browser automatically')
     .action(async (options) => {
         const targetPort = parseInt(options.port, 10);
+        const requestedAwelPort = parseInt(options.awelPort, 10);
         if (options.verbose) setVerbose(true);
         const shouldOpen = options.open !== false;
 
@@ -76,10 +78,10 @@ program
         initHistory(cwd);
         initSession(cwd);
 
-        // Find an available port for Awel (bumps if default is occupied)
-        const awelPort = await findAvailablePort(AWEL_PORT);
-        if (awelPort !== AWEL_PORT) {
-            awel.log(`⚠️  Port ${AWEL_PORT} is in use, using ${awelPort} instead`);
+        // Find an available port for Awel (bumps if requested is occupied)
+        const awelPort = await findAvailablePort(requestedAwelPort);
+        if (awelPort !== requestedAwelPort) {
+            awel.log(`⚠️  Port ${requestedAwelPort} is in use, using ${awelPort} instead`);
         }
 
         awel.log('🌟 Starting Awel...');

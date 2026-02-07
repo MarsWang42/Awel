@@ -42,13 +42,24 @@ interface ProviderEntry {
     models: { id: string; label: string }[]
 }
 
+const COMPARISON_VIEW_KEY = 'awel-comparison-view'
+type ViewState = 'card' | 'collapsed' | 'chat'
+
+function getStoredViewState(): ViewState {
+    try {
+        const v = sessionStorage.getItem(COMPARISON_VIEW_KEY)
+        if (v === 'collapsed' || v === 'chat') return v
+    } catch { /* ignore */ }
+    return 'card'
+}
+
 export function ComparisonView() {
     const { t } = useTranslation()
     const { resolvedTheme, setTheme } = useTheme()
     const [comparisonState, setComparisonState] = useState<ComparisonState | null>(null)
-    // Always start expanded on page load
-    const [isCollapsed, setIsCollapsed] = useState(false)
-    const [isChatOpen, setIsChatOpen] = useState(false)
+    const storedView = useRef(getStoredViewState())
+    const [isCollapsed, setIsCollapsed] = useState(storedView.current !== 'card')
+    const [isChatOpen, setIsChatOpen] = useState(storedView.current === 'chat')
     const [modelSelectorOpen, setModelSelectorOpen] = useState(false)
     const [editedPrompt, setEditedPrompt] = useState('')
     const [providers, setProviders] = useState<ProviderEntry[]>([])
@@ -61,6 +72,25 @@ export function ComparisonView() {
     const activeRun = comparisonState?.runs.find(r => r.id === comparisonState.activeRunId)
     const selectedModel = activeRun?.modelId || ''
     const selectedModelProvider = activeRun?.modelProvider || ''
+
+    // Persist collapse/chat state to sessionStorage
+    useEffect(() => {
+        const view: ViewState = isChatOpen ? 'chat' : isCollapsed ? 'collapsed' : 'card'
+        try { sessionStorage.setItem(COMPARISON_VIEW_KEY, view) } catch { /* ignore */ }
+    }, [isCollapsed, isChatOpen])
+
+    // Restore parent iframe size from persisted state on first render
+    const restoredRef = useRef(false)
+    useEffect(() => {
+        if (!comparisonState || restoredRef.current) return
+        restoredRef.current = true
+        const view = storedView.current
+        if (view === 'chat') {
+            window.parent.postMessage({ type: 'AWEL_COMPARISON_EXPAND', chat: true }, '*')
+        } else if (view === 'collapsed') {
+            window.parent.postMessage({ type: 'AWEL_COMPARISON_COLLAPSE' }, '*')
+        }
+    }, [comparisonState])
 
     // Fetch comparison state on mount
     useEffect(() => {

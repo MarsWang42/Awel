@@ -107,20 +107,27 @@ export const ModelSelector = forwardRef<ModelSelectorHandle, ModelSelectorProps>
         },
     }))
 
-    const isClaudeCode = selectedModelProvider === 'claude-code'
+    const SELF_CONTAINED_PROVIDERS = new Set(['claude-code', 'codex-cli'])
+    const isSelfContained = SELF_CONTAINED_PROVIDERS.has(selectedModelProvider)
 
     const handleModelSelect = useCallback((modelId: string, providerId: string) => {
-        const selectingClaudeCode = providerId === 'claude-code'
-        const switchingFromClaudeCode = !selectingClaudeCode && isClaudeCode && chatHasMessages
+        const selectingSelfContained = SELF_CONTAINED_PROVIDERS.has(providerId)
+        const switchingFromSelfContained = !selectingSelfContained && isSelfContained && chatHasMessages
 
-        // Selecting Claude Code (and not already on it) → show warning
-        if (selectingClaudeCode && !isClaudeCode) {
+        // Selecting a self-contained provider (and not already on one) → show warning
+        if (selectingSelfContained && !isSelfContained) {
             setPendingClaudeCode({ modelId, providerId })
             return
         }
 
-        // Switching away from Claude Code with messages → show clear history warning
-        if (switchingFromClaudeCode) {
+        // Switching between different self-contained providers → show warning
+        if (selectingSelfContained && isSelfContained && providerId !== selectedModelProvider && chatHasMessages) {
+            setPendingClaudeCode({ modelId, providerId })
+            return
+        }
+
+        // Switching away from self-contained provider with messages → show clear history warning
+        if (switchingFromSelfContained) {
             setPendingSwitch({ modelId, providerId })
             return
         }
@@ -128,7 +135,7 @@ export const ModelSelector = forwardRef<ModelSelectorHandle, ModelSelectorProps>
         // Otherwise, just switch
         onModelChange(modelId, providerId)
         setIsModalOpen(false)
-    }, [isClaudeCode, chatHasMessages, onModelChange])
+    }, [isSelfContained, selectedModelProvider, chatHasMessages, onModelChange])
 
     // Confirm Claude Code warning
     const handleConfirmClaudeCode = useCallback(async () => {
@@ -170,7 +177,7 @@ export const ModelSelector = forwardRef<ModelSelectorHandle, ModelSelectorProps>
         return null
     })()
 
-    const disabled = chatHasMessages && isClaudeCode && !onClearHistory
+    const disabled = chatHasMessages && isSelfContained && !onClearHistory
 
     const availableProviders = providers.filter(p => p.available)
     const unavailableProviders = providers.filter(p => !p.available)
@@ -428,7 +435,7 @@ export const ModelSelector = forwardRef<ModelSelectorHandle, ModelSelectorProps>
                                                 <Lock className="w-3 h-3 text-muted-foreground" />
                                                 <span>{provider.label}</span>
                                                 <span className="text-[10px] text-muted-foreground">
-                                                    {provider.id === 'claude-code' ? 'CLI not installed' : 'API key required'}
+                                                    {provider.id === 'claude-code' || provider.id === 'codex-cli' ? 'CLI not installed' : 'API key required'}
                                                 </span>
                                             </div>
                                             {provider.envVar && <EnvKeyRow envVar={provider.envVar} />}

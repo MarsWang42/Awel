@@ -3,6 +3,7 @@ import { createOpenAI } from '@ai-sdk/openai';
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { createAnthropic } from '@ai-sdk/anthropic';
 import { claudeCode } from 'ai-sdk-provider-claude-code';
+import { codexCli } from 'ai-sdk-provider-codex-cli';
 import { createMinimax } from 'vercel-minimax-ai-provider';
 import { createZhipu } from 'zhipu-ai-provider';
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
@@ -257,6 +258,8 @@ function createModel(modelId: string, providerType: ProviderType, cwd?: string) 
             maxTurns: 25,
             systemPrompt: { type: 'preset', preset: 'claude_code', append: appendPrompt },
         });
+    } else if (providerType === 'codex-cli') {
+        return codexCli(modelId, { codexPath: 'codex', fullAuto: true, cwd });
     } else if (providerType === 'anthropic') {
         const anthropic = createAnthropic({});
         return anthropic(modelId);
@@ -298,6 +301,7 @@ export function createVercelProvider(modelId: string, providerType: ProviderType
         ): Promise<ResponseMessage[]> {
             const PROVIDER_LABEL_MAP: Record<ProviderType, string> = {
                 'claude-code': 'Claude Code',
+                'codex-cli': 'Codex CLI',
                 anthropic: 'Anthropic',
                 openai: 'OpenAI',
                 'google-ai': 'Google AI',
@@ -321,13 +325,13 @@ export function createVercelProvider(modelId: string, providerType: ProviderType
 
             // Self-contained providers have built-in tools, system prompt, and execution
             // loop via the `cwd` config — they don't need Awel's tools or system prompt.
-            const isSelfContained = providerType === 'claude-code';
+            const isSelfContained = providerType === 'claude-code' || providerType === 'codex-cli';
             const model = createModel(modelId, providerType, config.projectCwd);
 
             // emitSSE helper used by tools that need to send events (e.g. confirmations)
             const emitSSE = (event: string, data: string) => {
                 addToHistory(event, data);
-                stream.writeSSE({ event, data }).catch(() => {});
+                stream.writeSSE({ event, data }).catch(() => { });
             };
 
             const tools = isSelfContained ? undefined : awelTools({
@@ -601,6 +605,11 @@ export function createVercelProvider(modelId: string, providerType: ProviderType
                                         ? te.error
                                         : JSON.stringify(te.error);
                                 logEvent('tool-error', `${te.toolName ?? 'unknown'} ${toolErrMsg}`);
+
+                                // Self-contained providers execute tools internally. The AI SDK
+                                // emits NoSuchToolError because these tool calls lack the
+                                // `dynamic` flag — suppress them rather than surfacing to the user.
+                                if (isSelfContained) break;
                                 const toolErrData = JSON.stringify({
                                     type: 'tool_result',
                                     tool_use_id: '',

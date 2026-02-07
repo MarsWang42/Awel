@@ -17,6 +17,19 @@ const PROVIDER_CATALOG: ProviderCatalogEntry[] = [
         ],
     },
     {
+        id: 'codex-cli',
+        label: 'Codex CLI',
+        color: 'text-green-600 dark:text-green-400',
+        envVar: null,
+        models: [
+            { id: 'gpt-5.3-codex', label: 'GPT-5.3 Codex' },
+            { id: 'gpt-5.2-codex', label: 'GPT-5.2 Codex' },
+            { id: 'gpt-5.1-codex', label: 'GPT-5.1 Codex' },
+            { id: 'gpt-5.2-codex-mini', label: 'GPT-5.2 Codex Mini' },
+            { id: 'gpt-5.1-codex-mini', label: 'GPT-5.1 Codex Mini' },
+        ],
+    },
+    {
         id: 'anthropic',
         label: 'Anthropic API',
         color: 'text-orange-600 dark:text-orange-400',
@@ -34,7 +47,7 @@ const PROVIDER_CATALOG: ProviderCatalogEntry[] = [
         color: 'text-green-600 dark:text-green-400',
         envVar: 'OPENAI_API_KEY',
         models: [
-            { id: 'gpt-5.3-codex', label: 'GPT-5.3 Codex' },
+            { id: 'gpt-5.3-codex-medium', label: 'GPT-5.3 Codex Medium' },
             { id: 'gpt-5.2-codex', label: 'GPT-5.2 Codex' },
             { id: 'gpt-5.1-codex', label: 'GPT-5.1 Codex' },
             { id: 'gpt-5.2-pro', label: 'GPT-5.2 Pro' },
@@ -134,6 +147,22 @@ export function isClaudeBinaryAvailable(): boolean {
     return _claudeBinaryAvailable;
 }
 
+/**
+ * Checks whether the `codex` CLI binary is available in PATH.
+ * Cached after first call since the binary won't appear/disappear mid-session.
+ */
+let _codexBinaryAvailable: boolean | null = null;
+export function isCodexBinaryAvailable(): boolean {
+    if (_codexBinaryAvailable !== null) return _codexBinaryAvailable;
+    try {
+        execSync('which codex', { stdio: 'ignore' });
+        _codexBinaryAvailable = true;
+    } catch {
+        _codexBinaryAvailable = false;
+    }
+    return _codexBinaryAvailable;
+}
+
 // ─── Provider Catalog API ─────────────────────────────────────
 
 /**
@@ -149,6 +178,15 @@ export function getProviderCatalog(): ProviderEntry[] {
                 ...entry,
                 available: hasBinary,
                 ...(!hasBinary && { unavailableReason: 'Claude Code CLI not installed' }),
+            };
+        }
+
+        if (entry.id === 'codex-cli') {
+            const hasBinary = isCodexBinaryAvailable();
+            return {
+                ...entry,
+                available: hasBinary,
+                ...(!hasBinary && { unavailableReason: 'Codex CLI not installed' }),
             };
         }
 

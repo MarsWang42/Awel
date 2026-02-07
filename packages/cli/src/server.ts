@@ -256,13 +256,13 @@ export async function startServer({ awelPort, targetPort, projectCwd, fresh }: S
 
   app.post('/api/comparison/abort', async (c) => {
     try {
-      abortComparison(projectCwd);
-      comparisonPhase = null;
+      const result = abortComparison(projectCwd);
+      comparisonPhase = result.comparing ? 'comparing' : null;
       // Clear chat history and session for a clean slate
       try { clearHistory(); } catch { /* non-critical */ }
       try { resetSession(); } catch { /* non-critical */ }
       try { resetAutoApprove(); } catch { /* non-critical */ }
-      return c.json({ success: true });
+      return c.json({ success: true, comparing: result.comparing });
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error';
       return c.json({ success: false, error: message }, 400);

@@ -62,37 +62,56 @@ function deleteComparisonState(projectCwd: string): void {
     }
 }
 
-/**
- * Abort comparison mode completely.
- * Used when user cancels during creation - cleans up all branches and state.
- */
-export function abortComparison(projectCwd: string): void {
-    const state = getComparisonState(projectCwd);
-    if (!state) return;
+export interface AbortResult {
+    /** True when other runs remain and we switched back to comparing mode. */
+    comparing: boolean;
+}
 
-    // Try to switch back to main branch
+/**
+ * Abort the current comparison run.
+ *
+ * If there are other completed runs, only the active (building) run is
+ * removed and we switch back to the previous run's branch in comparing
+ * phase. Otherwise the entire comparison is torn down.
+ */
+export function abortComparison(projectCwd: string): AbortResult {
+    const state = getComparisonState(projectCwd);
+    if (!state) return { comparing: false };
+
+    const activeRun = state.runs.find(r => r.id === state.activeRunId);
+    const otherRuns = state.runs.filter(r => r.id !== state.activeRunId);
+
+    // If there are other runs we can go back to, remove only the active run.
+    if (activeRun && otherRuns.length > 0) {
+        // Switch to the most recent successful run (or last remaining run)
+        const fallback = [...otherRuns].reverse().find(r => r.status === 'success')
+            ?? otherRuns[otherRuns.length - 1];
+
+        try { execGit(projectCwd, `checkout ${fallback.branchName}`); } catch { /* ignore */ }
+
+        // Now safe to delete the active run's branch
+        try { execGit(projectCwd, `branch -D ${activeRun.branchName}`); } catch { /* ignore */ }
+
+        state.runs = otherRuns;
+        state.activeRunId = fallback.id;
+        state.phase = 'comparing';
+        writeComparisonState(projectCwd, state);
+        return { comparing: true };
+    }
+
+    // No other runs — full teardown
     try {
         execGit(projectCwd, 'checkout main');
     } catch {
-        // May already be on main or main doesn't exist
-        try {
-            execGit(projectCwd, 'checkout master');
-        } catch {
-            // Ignore - we'll still clean up the state file
-        }
+        try { execGit(projectCwd, 'checkout master'); } catch { /* ignore */ }
     }
 
-    // Delete all comparison branches
     for (const run of state.runs) {
-        try {
-            execGit(projectCwd, `branch -D ${run.branchName}`);
-        } catch {
-            // Branch may not exist or may be current branch
-        }
+        try { execGit(projectCwd, `branch -D ${run.branchName}`); } catch { /* ignore */ }
     }
 
-    // Remove comparison state file
     deleteComparisonState(projectCwd);
+    return { comparing: false };
 }
 
 function execGit(projectCwd: string, args: string): string {
